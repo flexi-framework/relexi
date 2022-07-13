@@ -16,7 +16,7 @@ def get_host():
   """
   Get the host the script is executed on from the env variable
   """
-  return  os.environ["HOSTNAME"]
+  return  socket.gethostname()
 
 
 def get_pbs_hosts():
@@ -117,8 +117,7 @@ def init_smartsim(port = 6790
     launcher_type ="local"
     orchestrator_type = "local"
     db_is_clustered=False
-    localhost = get_host()
-    hosts = [localhost]
+    hosts = [get_host()]
 
 
   # Generate flexi experiment
@@ -129,7 +128,7 @@ def init_smartsim(port = 6790
   if orchestrator_type.casefold() == "local":
     db = Orchestrator(
             port=port,
-            interface=NETWORK_INTERFACE
+            interface='lo'
             )
 
   elif orchestrator_type.casefold() =="pbs":

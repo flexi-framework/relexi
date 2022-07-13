@@ -261,8 +261,13 @@ def clean_ompi_tmpfiles():
   """
   Cleans up temporary files which are created by openmpi in TMPDIR
   Avoids running out of space in TMPDIR
+  If TMPDIR is not found exists with -1 status
   """
-  tmpdir = os.environ['TMPDIR']
+  try:
+    tmpdir = os.environ['TMPDIR']
+  except:
+    return -1
+
   path = os.path.join(tmpdir,'ompi.*')
   path = glob.glob(path)
 
