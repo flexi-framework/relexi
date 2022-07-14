@@ -9,14 +9,14 @@ project:
 
 # All parameters for setting up the environment
 environment:
-  num_procs_per_environment:  4
+  num_procs_per_environment:  2
   num_parallel_environments:  4
   num_episodes_per_iteration: 4
   library_path: 
   parameter_file: ./simulation_files/parameter_flexi.ini
   mesh_file: ./simulation_files/CART_HEX_PERIODIC_004_mesh.h5
   #local_dir: /var/tmp
-  mpi_launch_mpmd: True
+  mpi_launch_mpmd: False
 
 # All parameters for setting up the reward
 reward:
@@ -29,7 +29,7 @@ reward:
 training:
   train_num_epochs: 5
   train_learning_rate: 1.e-4
-  train_num_iterations: 1000
+  train_num_iterations: 10
   train_buffer_capacity: 2000
   train_files:
     - ./simulation_files/N7_4Elems/run_f200_N7_4Elems_State_0000003.000000000.h5
