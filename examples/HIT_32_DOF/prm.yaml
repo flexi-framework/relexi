@@ -9,10 +9,9 @@ project:
 
 # All parameters for setting up the environment
 environment:
-  num_procs_per_environment:  2
-  num_parallel_environments:  4
-  num_episodes_per_iteration: 4
-  library_path: 
+  num_procs_per_environment:  1
+  num_parallel_environments:  2
+  executable_path: ../../../flexi-extensions/build/bin/flexi
   parameter_file: ./simulation_files/parameter_flexi.ini
   mesh_file: ./simulation_files/CART_HEX_PERIODIC_004_mesh.h5
   #local_dir: /var/tmp

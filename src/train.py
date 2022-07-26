@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import sys
-sys.path.append('/zhome/academic/HLRS/hlrs/hpchppof/hawk\-ai/relexi/relexi/flexiEnvSmartSim')
 import flexiEnvSmartSim
 import models
 import readin
@@ -327,7 +326,7 @@ def copy_to_nodes(my_files, base_path, hosts, subfolder=None):
 
 def train( config_file
           ,parameter_file
-          ,library_path
+          ,executable_path
           ,train_files
           ,train_learning_rate
           ,discount_factor
@@ -342,7 +341,7 @@ def train( config_file
           ,log_interval = 1
           ,num_procs_per_environment  = 1
           ,num_parallel_environments  = 1
-          ,num_episodes_per_iteration = 10
+          #,num_episodes_per_iteration = 10
           ,train_num_epochs           = 5
           ,train_num_iterations       = 1000
           ,train_buffer_capacity      = 1000
@@ -399,7 +398,7 @@ def train( config_file
   ckpt_dir  = base_dir+"/ckpt/"
 
   # Check if all necessary files actually exist
-  missing_files = readin.files_exist([library_path,parameter_file,train_files,eval_files,reward_spectrum_file])
+  missing_files = readin.files_exist([executable_path,parameter_file,train_files,eval_files,reward_spectrum_file])
   for item in missing_files:
     printWarning("The specified file "+item+" does not exist")
 
@@ -468,7 +467,7 @@ def train( config_file
   # Instantiate parallel collection environment
   my_env = tf_py_environment.TFPyEnvironment(
            flexiEnvSmartSim.flexiEnv(exp
-                                    ,library_path
+                                    ,executable_path
                                     ,parameter_file
                                     ,tag              = 'train'
                                     ,port             = smartsim_port
@@ -495,7 +494,7 @@ def train( config_file
 
   my_eval_env = tf_py_environment.TFPyEnvironment(
                 flexiEnvSmartSim.flexiEnv(exp
-                                         ,library_path
+                                         ,executable_path
                                          ,parameter_file
                                          ,tag              = 'eval'
                                          ,port             = smartsim_port
@@ -560,6 +559,9 @@ def train( config_file
                      data_spec  = tf_agent.collect_data_spec,
                      batch_size = my_env.batch_size,
                      max_length = train_buffer_capacity)
+
+  # Currently sampling in several times not supported
+  num_episodes_per_iteration=num_parallel_environments
 
   # Instantiate driver for data collection
   num_episodes = tf_metrics.NumberOfEpisodes(name='num_episodes')
