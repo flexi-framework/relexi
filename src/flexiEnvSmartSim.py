@@ -14,7 +14,7 @@ from tf_agents.trajectories import time_step as ts
 
 from smartsim import Experiment
 from smartsim.database import PBSOrchestrator,Orchestrator
-from smartsim.settings import MpirunSettings
+from smartsim.settings import MpirunSettings,RunSettings
 
 from smartredis import Client
 
@@ -67,6 +67,7 @@ class flexiEnv(py_environment.PyEnvironment):
                ,hosts = None
                ,rankfiles = None
                ,mpi_launch_mpmd = False
+               ,env_launcher = 'mpirun'
                ):
     """Initialize TF and FLEXI specific properties"""
 
@@ -83,7 +84,18 @@ class flexiEnv(py_environment.PyEnvironment):
     self.flexi_path = flexi_path
     self.hosts = hosts
     self.rankfiles = rankfiles
-    self.mpi_launch_mpmd = mpi_launch_mpmd
+
+    # Sanity Check Launcher
+    self.env_launcher = env_launcher
+    if ((self.env_launcher == 'local') and (n_procs != 1)):
+      printWarning("For env_launcher 'local', only single execution is allowed! Setting 'n_procs=1'!")
+      printWarning("To run evironments in parallel with MPI, use env_launcher='mpi'!")
+      n_procs = 1
+
+    if (self.env_launcher == 'mpirun'):
+      self.mpi_launch_mpmd = mpi_launch_mpmd
+    else:   
+      self.mpi_launch_mpmd = False
 
     # Save list of restart files
     self.random_restart_file = random_restart_file
@@ -216,21 +228,25 @@ class flexiEnv(py_environment.PyEnvironment):
         args.append('--tag')
         args.append(self.tag[i])
 
-      run_args = {"rankfile" : self.rankfiles[i] ,"report-bindings" : ""}
-      mpi = MpirunSettings(exe=self.flexi_path, exe_args=args, run_args=run_args)
-      mpi.set_tasks(n_procs)
-      mpi.set_hostlist(self.hosts[hosts_per_flexi[i,0]:hosts_per_flexi[i,1]+1])
+      if (self.env_launcher == 'mpirun'):
+        run_args = {"rankfile" : self.rankfiles[i] ,"report-bindings" : ""}
+        run = MpirunSettings(exe=self.flexi_path, exe_args=args, run_args=run_args)
+        run.set_tasks(n_procs)
+        run.set_hostlist(self.hosts[hosts_per_flexi[i,0]:hosts_per_flexi[i,1]+1])
 
-      # Create MPMD Settings and start later in single command
-      if self.mpi_launch_mpmd:
-        if i==0:
-          f_mpmd = mpi
-        else:
-          f_mpmd.make_mpmd(mpi)
+        # Create MPMD Settings and start later in single command
+        if self.mpi_launch_mpmd:
+          if i==0:
+            f_mpmd = run
+          else:
+            f_mpmd.make_mpmd(run)
+
+      else: # Otherwise do not use launcher
+        run = RunSettings(exe=self.flexi_path, exe_args=args)
 
       # Create and directly start FLEXI instances
-      else:
-        flexi_instance = exp.create_model(self.tag[i]+"flexi", mpi)
+      if not self.mpi_launch_mpmd:
+        flexi_instance = exp.create_model(self.tag[i]+"flexi", run)
         exp.start(flexi_instance, block=False,summary=False)
         flexi.append(flexi_instance)
 

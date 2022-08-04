@@ -16,6 +16,7 @@ environment:
   mesh_file: ./simulation_files/CART_HEX_PERIODIC_004_mesh.h5
   #local_dir: /var/tmp
   mpi_launch_mpmd: False
+  env_launcher: local
 
 # All parameters for setting up the reward
 reward:
@@ -28,7 +29,7 @@ reward:
 training:
   train_num_epochs: 5
   train_learning_rate: 1.e-4
-  train_num_iterations: 10
+  train_num_iterations: 1
   train_buffer_capacity: 2000
   train_files:
     - ./simulation_files/run_f200_N5_4Elems_State_0000003.000000000.h5

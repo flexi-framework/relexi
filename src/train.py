@@ -361,6 +361,7 @@ def train( config_file
           ,smartsim_num_dbs = 1
           ,smartsim_launcher = "local"
           ,smartsim_orchestrator = "local"
+          ,env_launcher = "mpirun"
           ,mpi_launch_mpmd = False
           ,local_dir = None
           ,n_procs_per_node=128 # Hawk
@@ -483,6 +484,7 @@ def train( config_file
                                     ,reward_scale     = reward_scale
                                     ,restart_files    = train_files
                                     ,rankfiles        = rank_files
+                                    ,env_launcher     = env_launcher
                                     ,mpi_launch_mpmd  = mpi_launch_mpmd
                                     ,debug            = debug
                                     ))
@@ -509,8 +511,9 @@ def train( config_file
                                          ,reward_scale     = reward_scale
                                          ,restart_files    = eval_files
                                          ,random_restart_file = False
-                                         ,debug            = debug
                                          ,rankfiles        = rank_files
+                                         ,env_launcher     = env_launcher
+                                         ,debug            = debug
                                          ))
 
 
