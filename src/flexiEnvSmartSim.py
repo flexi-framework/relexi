@@ -296,8 +296,17 @@ class flexiEnv(py_environment.PyEnvironment):
       # The last action ended the episode. Ignore the current action and start a new episode.
       return self.reset()
 
+    # Scale actions
+    action_mod = action * 0.5
+
+    # Check for and replace NaN in actions
+    action_nan = np.isnan(action_mod)
+    if action_nan.any():
+      printWarning('NaN action found.')
+      action_mod[action_nan] = 0.25
+
     # Update Prediction
-    self._set_prediction(action)
+    self._set_prediction(action_mod)
 
     # Poll New State
     # ATTENTION: HERE THE FLEXI TIMESTEPPING OCCURS!

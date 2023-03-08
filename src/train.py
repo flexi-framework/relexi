@@ -348,6 +348,7 @@ def train( config_file
           ,entropy_regularization     = 0.0
           ,importance_ratio_clipping  = 0.2
           ,action_std        = 0.02
+          ,dist_type         = 'normal'
           ,ckpt_interval     = 5
           ,ckpt_num          = 1000
           ,eval_files        = None
@@ -532,6 +533,7 @@ def train( config_file
     actor_net = models.ActionNetCNN(my_env.observation_spec()
                                      ,my_env.action_spec()
                                      ,action_std=action_std
+                                     ,dist_type=dist_type
                                      ,debug=debug)
     value_net = models.ValueNetCNN( my_env.observation_spec()
                                      ,debug=debug)
