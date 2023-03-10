@@ -59,9 +59,6 @@ class ActionNetCNN(network.Network):
       # Unsquash in time
       action_means = batch_squash.unflatten(action_means)
 
-      # Scale to specs
-      #action_means = tanh_squash_to_spec(action_means, self._output_tensor_spec)
-
       # Get standard deviation for actions
       action_std = tf.ones_like(action_means)*self._action_std
 
@@ -72,23 +69,15 @@ class ActionNetCNN(network.Network):
       # Evaluate model
       beta_coeffs = self._model(observations)
 
-      # Remove extra dimensions
-      if beta_coeffs.shape.as_list()[0]==1:
-        beta_coeffs = tf.squeeze(beta_coeffs)
-        beta_coeffs = tf.expand_dims(beta_coeffs, 0)  # add back extra dimension for eval run
-      else:
-        beta_coeffs = tf.squeeze(beta_coeffs)
+      # Get arrays of alpha & beta values (tf.identity copies the data to new tensor instead of referencing)
+      beta_coeff1 = batch_squash.unflatten(tf.identity(beta_coeffs[:,:,0]))
+      beta_coeff2 = batch_squash.unflatten(tf.identity(beta_coeffs[:,:,1]))
 
-      # Cast to float32
-      beta_coeffs = tf.cast(beta_coeffs, dtype=tf.float32)
+      # Build scalar Beta Distributions
+      beta_distr = tfp.distributions.Beta(beta_coeff1,beta_coeff2,allow_nan_stats=False)
 
-      # Get arrays of alpha & beta values
-      beta_coeff1 = beta_coeffs[:,:,0]
-      beta_coeff2 = beta_coeffs[:,:,1]
-      beta_coeff1 = batch_squash.unflatten(beta_coeff1)
-      beta_coeff2 = batch_squash.unflatten(beta_coeff2)
-
-      return tfp.distributions.Beta(beta_coeff1, beta_coeff2), network_state
+      # Build global distribution of independent elementwise Beta distributions. Only last dimension is sampling dimension
+      return tfp.distributions.Independent(distribution=beta_distr,reinterpreted_batch_ndims=1), network_state
 
 
   def _buildmodel(self,kernel,dist_type,debug):
@@ -121,10 +110,12 @@ class ActionNetCNN(network.Network):
     elif dist_type=='beta':
       # Filter size of last conv layer defines the number of output parameters
       bias_init = tf.keras.initializers.Constant(value=1.0)
-      outputs   = tf.keras.layers.Conv3D( 2,last_kernel, padding='valid'
+      x         = tf.keras.layers.Conv3D( 2,last_kernel, padding='valid'
                                            ,activation='softplus',kernel_initializer='he_uniform',bias_initializer=bias_init)(x)
-      ## relu in last conv layer gives values from 0 to inf, +1 to avoid coefficients <1 which gives an U-shaped distributions
-      #outputs = tf.keras.layers.Lambda(lambda x: x+1.0)(x)
+      x = tf.keras.layers.TimeDistributed(tf.keras.layers.Flatten())(x)
+      # relu in last conv layer gives values from 0 to inf.
+      # Hence, add +1+eps to avoid coefficients <=1 which break TF for greedy evaluation
+      outputs = tf.keras.layers.Lambda(lambda x: x+1.+tf.keras.backend.epsilon())(x)
 
     # Create keras model
     self._model = tf.keras.Model(inputs=inputs, outputs=outputs, name='Actor_CNN')

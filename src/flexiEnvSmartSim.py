@@ -94,7 +94,7 @@ class flexiEnv(py_environment.PyEnvironment):
 
     if (self.env_launcher == 'mpirun'):
       self.mpi_launch_mpmd = mpi_launch_mpmd
-    else:   
+    else:
       self.mpi_launch_mpmd = False
 
     # Save list of restart files
@@ -296,17 +296,8 @@ class flexiEnv(py_environment.PyEnvironment):
       # The last action ended the episode. Ignore the current action and start a new episode.
       return self.reset()
 
-    # Scale actions
-    action_mod = action * 0.5
-
-    # Check for and replace NaN in actions
-    action_nan = np.isnan(action_mod)
-    if action_nan.any():
-      printWarning('NaN action found.')
-      action_mod[action_nan] = 0.25
-
     # Update Prediction
-    self._set_prediction(action_mod)
+    self._set_prediction(action)
 
     # Poll New State
     # ATTENTION: HERE THE FLEXI TIMESTEPPING OCCURS!
@@ -336,8 +327,11 @@ class flexiEnv(py_environment.PyEnvironment):
 
   def _set_prediction(self,action):
     """ Write action for current environment state in to the Database to be polled by the FLEXI client."""
+    # Scale actions to [0,0.5]
+    # TODO: make this a user parameter
+    action_mod = action * 0.5
     for i in range(self.n_envs):
-      dataset = self.client.put_tensor(self.tag[i]+"Cs",action[i,::].astype(np.float64))
+      dataset = self.client.put_tensor(self.tag[i]+"Cs",action_mod[i,::].astype(np.float64))
 
 
   def _get_current_state(self):
