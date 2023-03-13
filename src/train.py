@@ -375,11 +375,6 @@ def train( config_file
   and trains the agent on the sampled trajectories.
   """
 
-  # Set random seed if given
-  if random_seed:
-    random.seed(random_seed)        # Python seed
-    tf.random.set_seed(random_seed) # TF seed
-
   # Set output dir to restart dir, if given.
   # TODO: make this more robust
   if restart_dir is not None:
@@ -529,6 +524,11 @@ def train( config_file
     context = contextlib.nullcontext() # Placeholder that does nothing
 
   with context:
+    # Set TF random seed within strategy to obtain reproducible results
+    if random_seed:
+      random.seed(random_seed)        # Python seed
+      tf.random.set_seed(random_seed) # TF seed
+
     # Instantiate actor net
     actor_net = models.ActionNetCNN(my_env.observation_spec()
                                      ,my_env.action_spec()
