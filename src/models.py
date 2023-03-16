@@ -29,6 +29,7 @@ class ActionNetCNN(network.Network):
               ,output_tensor_spec
               ,kernel=3
               ,action_std=0.02
+              ,dist_type='normal'
               ,debug=0):
     super(ActionNetCNN, self).__init__(
         input_tensor_spec = input_tensor_spec,
@@ -36,10 +37,12 @@ class ActionNetCNN(network.Network):
         name='ActionNetCNN')
     self._output_tensor_spec = output_tensor_spec
     self._action_std = action_std
+    self._dist_type = dist_type
 
     # Build model
     self.kernel=kernel
-    self._buildmodel(kernel,debug)
+    self._buildmodel(kernel,dist_type,debug)
+
 
   def call(self, observations, step_type, network_state):
     del step_type
@@ -49,22 +52,35 @@ class ActionNetCNN(network.Network):
     batch_squash = utils.BatchSquash(outer_rank)
     observations = tf.nest.map_structure(batch_squash.flatten, observations)
 
-    # Evaluate model
-    action_means = self._model(observations)
+    if self._dist_type=='normal':
+      # Evaluate model
+      action_means = self._model(observations)
 
-    # Unsquash in time
-    action_means = batch_squash.unflatten(action_means)
+      # Unsquash in time
+      action_means = batch_squash.unflatten(action_means)
 
-    # Scale to specs
-    #action_means = tanh_squash_to_spec(action_means, self._output_tensor_spec)
+      # Get standard deviation for actions
+      action_std = tf.ones_like(action_means)*self._action_std
 
-    # Get standard deviation for actions
-    action_std = tf.ones_like(action_means)*self._action_std
+      # Return distribution
+      return tfp.distributions.MultivariateNormalDiag(action_means, action_std), network_state
 
-    # Return distribution
-    return tfp.distributions.MultivariateNormalDiag(action_means, action_std), network_state
+    elif self._dist_type=='beta':
+      # Evaluate model
+      beta_coeffs = self._model(observations)
 
-  def _buildmodel(self,kernel,debug):
+      # Get arrays of alpha & beta values (tf.identity copies the data to new tensor instead of referencing)
+      beta_coeff1 = batch_squash.unflatten(tf.identity(beta_coeffs[:,:,0]))
+      beta_coeff2 = batch_squash.unflatten(tf.identity(beta_coeffs[:,:,1]))
+
+      # Build scalar Beta Distributions
+      beta_distr = tfp.distributions.Beta(beta_coeff1,beta_coeff2,allow_nan_stats=False)
+
+      # Build global distribution of independent elementwise Beta distributions. Only last dimension is sampling dimension
+      return tfp.distributions.Independent(distribution=beta_distr,reinterpreted_batch_ndims=1), network_state
+
+
+  def _buildmodel(self,kernel,dist_type,debug):
     input_shape = self._input_tensor_spec.shape
     Np1 = input_shape[-2]
 
@@ -86,9 +102,20 @@ class ActionNetCNN(network.Network):
       nf    = max( (8/(np.power(2,i))), 2) # number of filters
       x     = tf.keras.layers.Conv3D(nf,kernel,padding='valid',activation='relu',kernel_initializer='he_uniform')(x)
 
-    x       = tf.keras.layers.Conv3D( 1,last_kernel,padding='valid',activation= 'sigmoid', kernel_initializer='he_uniform')(x)
-    x       = tf.keras.layers.Lambda(lambda x: x*0.5)(x)
-    outputs = tf.keras.layers.Flatten()(x)
+    if dist_type=='normal':
+      x       = tf.keras.layers.Conv3D( 1,last_kernel,padding='valid',activation= 'sigmoid', kernel_initializer='he_uniform')(x)
+      #x       = tf.keras.layers.Lambda(lambda x: x*0.5)(x)
+      outputs = tf.keras.layers.Flatten()(x)
+
+    elif dist_type=='beta':
+      # Filter size of last conv layer defines the number of output parameters
+      bias_init = tf.keras.initializers.Constant(value=1.0)
+      x         = tf.keras.layers.Conv3D( 2,last_kernel, padding='valid'
+                                           ,activation='softplus',kernel_initializer='he_uniform',bias_initializer=bias_init)(x)
+      x = tf.keras.layers.TimeDistributed(tf.keras.layers.Flatten())(x)
+      # relu in last conv layer gives values from 0 to inf.
+      # Hence, add +1+eps to avoid coefficients <=1 which break TF for greedy evaluation
+      outputs = tf.keras.layers.Lambda(lambda x: x+1.+tf.keras.backend.epsilon())(x)
 
     # Create keras model
     self._model = tf.keras.Model(inputs=inputs, outputs=outputs, name='Actor_CNN')

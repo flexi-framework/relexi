@@ -94,7 +94,7 @@ class flexiEnv(py_environment.PyEnvironment):
 
     if (self.env_launcher == 'mpirun'):
       self.mpi_launch_mpmd = mpi_launch_mpmd
-    else:   
+    else:
       self.mpi_launch_mpmd = False
 
     # Save list of restart files
@@ -327,8 +327,11 @@ class flexiEnv(py_environment.PyEnvironment):
 
   def _set_prediction(self,action):
     """ Write action for current environment state in to the Database to be polled by the FLEXI client."""
+    # Scale actions to [0,0.5]
+    # TODO: make this a user parameter
+    action_mod = action * 0.5
     for i in range(self.n_envs):
-      dataset = self.client.put_tensor(self.tag[i]+"Cs",action[i,::].astype(np.float64))
+      dataset = self.client.put_tensor(self.tag[i]+"Cs",action_mod[i,::].astype(np.float64))
 
 
   def _get_current_state(self):
