@@ -1,3 +1,5 @@
+import tensorflow as tf
+
 def write_metrics(metrics,step,category_name):
   """
   Adds all metrics in the list 'metrics' to the tf summary, which will be written to disk.

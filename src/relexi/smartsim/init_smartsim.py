@@ -8,8 +8,7 @@ import subprocess
 from smartsim import Experiment
 from smartsim.database import Orchestrator,PBSOrchestrator
 
-from output import printWarning,printNotice
-from output import printHeader,printBanner,printSmallBanner
+import relexi.io.output as rlxout
 
 
 def get_host():
@@ -70,11 +69,11 @@ def init_smartsim(port = 6790
     4. laun.: pbs,   orch.: local = not supported error: not supported by PBSPro  
   """
 
-  printSmallBanner('Starting SmartSim...')
+  rlxout.printSmallBanner('Starting SmartSim...')
 
   # Check whether launcher and orchestrator are identical (case-insensitive)
   if not (launcher_type.casefold() == orchestrator_type.casefold()):
-    printWarning('Chosen Launcher '+launcher_type+' and orchestrator '+orchestrator_type +' are incompatible! Please choose identical types for both!')
+    rlxout.printWarning('Chosen Launcher '+launcher_type+' and orchestrator '+orchestrator_type +' are incompatible! Please choose identical types for both!')
 
   # Is database clustered, i.e. hosted on different nodes?
   db_is_clustered = num_dbs > 1
@@ -87,28 +86,28 @@ def init_smartsim(port = 6790
       walltime = get_pbs_walltime()
       hosts = get_pbs_hosts()
       num_hosts = len(hosts)
-      printNotice(f"Identified available nodes: {hosts}")
+      rlxout.printNotice(f"Identified available nodes: {hosts}")
 
       # Maximum of 1 DB per node allowed for PBS Orchestrator
       if num_hosts < num_dbs:
-        printWarning(f"You selected {num_dbs} databases and {num_hosts} nodes, but maximum is 1 database per node. "+
+        rlxout.printWarning(f"You selected {num_dbs} databases and {num_hosts} nodes, but maximum is 1 database per node. "+
                       "Setting number of databases to {num_hosts}")
         num_dbs = num_hosts
 
       # Clustered DB with PBS orchestrator requires at least 3 nodes for reasons
       if db_is_clustered:
         if num_dbs < 3:
-          printWarning(f"Only {num_dbs} databases requested, but clustered orchestrator requires 3 or more databases. "+
+          rlxout.printWarning(f"Only {num_dbs} databases requested, but clustered orchestrator requires 3 or more databases. "+
                         "Non-clustered orchestrator is launched instead!")
           db_is_clustered = False
         else:
-          printNotice(f"Using a clustered database with {num_dbs} instances.")
+          rlxout.printNotice(f"Using a clustered database with {num_dbs} instances.")
       else:
-        printNotice(f"Using an UNclustered database on root node.")
+        rlxout.printNotice(f"Using an UNclustered database on root node.")
 
     except:
       # If there are no environment variables for a batchjob, then use the local launcher
-      printWarning(f"Didn't find pbs batch environment. Switching to local setup.")
+      rlxout.printWarning(f"Didn't find pbs batch environment. Switching to local setup.")
       PBS_failed = True
 
 
@@ -142,7 +141,7 @@ def init_smartsim(port = 6790
             run_command="mpirun"
             )
   else:
-    printWarning("Orchester type "+orchestrator_type+" not implemented")
+    rlxout.printWarning("Orchester type "+orchestrator_type+" not implemented")
 
 
   # remove db files from previous run if necessary
@@ -150,15 +149,15 @@ def init_smartsim(port = 6790
   #  db.remove_stale_files()
 
   # startup Orchestrator
-  printNotice("Starting the Database...",newline=False)
+  rlxout.printNotice("Starting the Database...",newline=False)
   exp.start(db)
 
   # get the database nodes and select the first one
   entry_db = socket.gethostbyname(db.hosts[0])
-  printNotice(f"Identified 1 of {len(db.hosts)} database hosts to later connect clients to: {entry_db}",newline=False)
-  printNotice(f"If the SmartRedis database isn't stopping properly you can use this command to stop it from the command line:")
+  rlxout.printNotice(f"Identified 1 of {len(db.hosts)} database hosts to later connect clients to: {entry_db}",newline=False)
+  rlxout.printNotice(f"If the SmartRedis database isn't stopping properly you can use this command to stop it from the command line:")
   for db_host in db.hosts:
-    printNotice(f"$(smart --dbcli) -h {db_host} -p {port} shutdown",newline=False)
+    rlxout.printNotice(f"$(smart --dbcli) -h {db_host} -p {port} shutdown",newline=False)
 
 
   # If multiple nodes are available, the first executes ReLeXI, while 

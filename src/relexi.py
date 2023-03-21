@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
-import relexi.io.output as rxout
-import relexi.io.readin as rxin
-import relexi.rl.ppo    as rxppo
+import relexi.io.output as rlxout
+import relexi.io.readin as rlxin
+import relexi.rl.ppo    as rlxppo
 
 import os
 import time
@@ -69,12 +69,12 @@ def main(argv):
   args = parse_commandline_flags()
 
   # Print Header to Console
-  rxout.printHeader()
+  rlxout.printHeader()
 
   # Check if we should run on CPU or GPU
   if args.force_cpu: # Force CPU execution
     os.environ["CUDA_VISIBLE_DEVICES"] ="-1"
-    rxout.printWarning('TensorFlow will be forced to run on CPU')
+    rlxout.printWarning('TensorFlow will be forced to run on CPU')
     strategy = None
   else: # Check if we find a GPU to run on
     strategy = init_gpus(args.num_gpus)
@@ -94,10 +94,10 @@ def main(argv):
   config = readin.read_config(args.config_file)
 
   # Start training with the parameters of config, which are passed to the function as dict.
-  rxppo.train.train(debug=args.debug,config_file=args.config_file,**config,strategy=strategy)
+  rlxppo.train.train(debug=args.debug,config_file=args.config_file,**config,strategy=strategy)
 
   # Finalize Training
-  rxout.printBanner('Sucessfully finished after: [%8.2f]s' % (time.time()-start_time))
+  rlxout.printBanner('Sucessfully finished after: [%8.2f]s' % (time.time()-start_time))
 
 
 if __name__ == "__main__":

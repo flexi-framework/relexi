@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 
-import flexiEnvSmartSim
-import models
-import readin
-import init_smartsim
-
-from output import printWarning,printNotice,printBanner,printSmallBanner
+import relexi.env.flexiEnvSmartSim
+import relexi.rl.models
+import relexi.smartsim.init_smartsim
+import relexi.io.readin as rlxin
+import relexi.io.output as rlxout
 
 import os
 import sys
@@ -107,9 +106,9 @@ def train( config_file
   ckpt_dir  = base_dir+"/ckpt/"
 
   # Check if all necessary files actually exist
-  missing_files = readin.files_exist([executable_path,parameter_file,train_files,eval_files,reward_spectrum_file])
+  missing_files = rlxin.readin.files_exist([executable_path,parameter_file,train_files,eval_files,reward_spectrum_file])
   for item in missing_files:
-    printWarning("The specified file "+item+" does not exist")
+    rlxout.printWarning("The specified file "+item+" does not exist")
 
   # Activate XLA for performance
   if use_XLA:
@@ -148,7 +147,7 @@ def train( config_file
       pbsJobID = os.environ['PBS_JOBID']
       local_dir = os.path.join(local_dir, pbsJobID)
 
-    printNotice("Moving local files to %s ..." % (local_dir))
+    rlxout.printNotice("Moving local files to %s ..." % (local_dir))
 
     # Get list of all nodes
     nodes = copy.deepcopy(worker_nodes)
@@ -167,7 +166,7 @@ def train( config_file
     parameter_file = parser_flexi_parameters(parameter_file, 'MeshFile', mesh_file)
     parameter_file = copy_to_nodes(parameter_file,local_dir,nodes,subfolder='parameter_files')
 
-    printNotice(" DONE! ",newline=False)
+    rlxout.printNotice(" DONE! ",newline=False)
 
   if mpi_launch_mpmd:
     rank_files = [rank_files[0] for _ in range(num_parallel_environments)]
@@ -175,54 +174,54 @@ def train( config_file
 
   # Instantiate parallel collection environment
   my_env = tf_py_environment.TFPyEnvironment(
-           flexiEnvSmartSim.flexiEnv(exp
-                                    ,executable_path
-                                    ,parameter_file
-                                    ,tag              = 'train'
-                                    ,port             = smartsim_port
-                                    ,entry_db         = entry_db
-                                    ,is_db_cluster    = is_db_cluster
-                                    ,hosts            = worker_nodes
-                                    ,n_envs           = num_parallel_environments
-                                    ,n_procs          = num_procs_per_environment
-                                    ,n_procs_per_node = n_procs_per_node
-                                    ,spectra_file     = reward_spectrum_file
-                                    ,reward_kmin      = reward_kmin
-                                    ,reward_kmax      = reward_kmax
-                                    ,reward_scale     = reward_scale
-                                    ,restart_files    = train_files
-                                    ,rankfiles        = rank_files
-                                    ,env_launcher     = env_launcher
-                                    ,mpi_launch_mpmd  = mpi_launch_mpmd
-                                    ,debug            = debug
-                                    ))
+           relexi.env.flexiEnvSmartSim.flexiEnv(exp
+                                               ,executable_path
+                                               ,parameter_file
+                                               ,tag              = 'train'
+                                               ,port             = smartsim_port
+                                               ,entry_db         = entry_db
+                                               ,is_db_cluster    = is_db_cluster
+                                               ,hosts            = worker_nodes
+                                               ,n_envs           = num_parallel_environments
+                                               ,n_procs          = num_procs_per_environment
+                                               ,n_procs_per_node = n_procs_per_node
+                                               ,spectra_file     = reward_spectrum_file
+                                               ,reward_kmin      = reward_kmin
+                                               ,reward_kmax      = reward_kmax
+                                               ,reward_scale     = reward_scale
+                                               ,restart_files    = train_files
+                                               ,rankfiles        = rank_files
+                                               ,env_launcher     = env_launcher
+                                               ,mpi_launch_mpmd  = mpi_launch_mpmd
+                                               ,debug            = debug
+                                               ))
 
   # Instantiate serial evaluation environment
   if eval_files is None:
-    printWarning('No specific Files for Evaluation specified. Using Training files instead')
+    rlxout.printWarning('No specific Files for Evaluation specified. Using Training files instead')
     eval_files = train_files
 
   my_eval_env = tf_py_environment.TFPyEnvironment(
-                flexiEnvSmartSim.flexiEnv(exp
-                                         ,executable_path
-                                         ,parameter_file
-                                         ,tag              = 'eval'
-                                         ,port             = smartsim_port
-                                         ,entry_db         = entry_db
-                                         ,is_db_cluster    = is_db_cluster
-                                         ,hosts            = worker_nodes
-                                         ,n_procs          = num_procs_per_environment
-                                         ,n_procs_per_node = n_procs_per_node
-                                         ,spectra_file     = reward_spectrum_file
-                                         ,reward_kmin      = reward_kmin
-                                         ,reward_kmax      = reward_kmax
-                                         ,reward_scale     = reward_scale
-                                         ,restart_files    = eval_files
-                                         ,random_restart_file = False
-                                         ,rankfiles        = rank_files
-                                         ,env_launcher     = env_launcher
-                                         ,debug            = debug
-                                         ))
+                relexi.env.flexiEnvSmartSim.flexiEnv(exp
+                                                    ,executable_path
+                                                    ,parameter_file
+                                                    ,tag              = 'eval'
+                                                    ,port             = smartsim_port
+                                                    ,entry_db         = entry_db
+                                                    ,is_db_cluster    = is_db_cluster
+                                                    ,hosts            = worker_nodes
+                                                    ,n_procs          = num_procs_per_environment
+                                                    ,n_procs_per_node = n_procs_per_node
+                                                    ,spectra_file     = reward_spectrum_file
+                                                    ,reward_kmin      = reward_kmin
+                                                    ,reward_kmax      = reward_kmax
+                                                    ,reward_scale     = reward_scale
+                                                    ,restart_files    = eval_files
+                                                    ,random_restart_file = False
+                                                    ,rankfiles        = rank_files
+                                                    ,env_launcher     = env_launcher
+                                                    ,debug            = debug
+                                                    ))
 
 
   # Get training variables
@@ -242,13 +241,13 @@ def train( config_file
       tf.random.set_seed(random_seed) # TF seed
 
     # Instantiate actor net
-    actor_net = models.ActionNetCNN(my_env.observation_spec()
-                                     ,my_env.action_spec()
-                                     ,action_std=action_std
-                                     ,dist_type=dist_type
-                                     ,debug=debug)
-    value_net = models.ValueNetCNN( my_env.observation_spec()
-                                     ,debug=debug)
+    actor_net = relexi.rl.models.models.ActionNetCNN(my_env.observation_spec()
+                                                    ,my_env.action_spec()
+                                                    ,action_std=action_std
+                                                    ,dist_type=dist_type
+                                                    ,debug=debug)
+    value_net = relexi.rl.models.ValueNetCNN( my_env.observation_spec()
+                                             ,debug=debug)
 
     # PPO Agent
     tf_agent = ppo_clip_agent.PPOClipAgent(
@@ -328,10 +327,10 @@ def train( config_file
 
 
   # Main train loop
-  printBanner('Starting Training Loop!')
+  rlxout.printBanner('Starting Training Loop!')
   with summary_writer.as_default():
     if do_profile:
-      printNotice('Starting profiling....')
+      rlxout.printNotice('Starting profiling....')
       tf.profiler.experimental.start(train_dir)
 
     start_time = time.time()
@@ -341,10 +340,10 @@ def train( config_file
 
     # Write parameter files to Tensorboard
     tf.summary.text("training_config"
-                   ,readin.read_file(config_file,newline='  \n') # TF uses markdown EOL
+                   ,rlxin.readin.read_file(config_file,newline='  \n') # TF uses markdown EOL
                    ,step=starting_iteration)
     tf.summary.text("flexi_config"
-                   ,readin.read_file(parameter_file,newline='  \n') # TF uses markdown EOL
+                   ,rlxin.readin.read_file(parameter_file,newline='  \n') # TF uses markdown EOL
                    ,step=starting_iteration)
 
     for i in range(starting_iteration ,train_num_iterations):
@@ -358,8 +357,8 @@ def train( config_file
         if my_eval_env.can_plot:
           tf.summary.image("Spectra", my_eval_env.plot(), step=global_step)
 
-        printNotice('Eval time: [%5.2f]s' % (time.time()-mytime))
-        printNotice('Eval average return: %f' % (eval_avg_return.result().numpy()),newline=False)
+        rlxout.printNotice('Eval time: [%5.2f]s' % (time.time()-mytime))
+        rlxout.printNotice('Eval average return: %f' % (eval_avg_return.result().numpy()),newline=False)
 
       mytime = time.time()
       collect_trajectories(collect_driver,my_env)
@@ -375,19 +374,19 @@ def train( config_file
 
       # Log to console every log_interval iterations
       if (i % log_interval) == 0:
-        printSmallBanner('ITERATION %i' % i)
+        rlxout.printSmallBanner('ITERATION %i' % i)
 
-        printNotice('Episodes:     %i' % (      num_episodes.result().numpy()),newline=False)
-        printNotice('Env. Steps:   %i' % (         env_steps.result().numpy()),newline=False)
-        printNotice('Train Steps:  %i' % (tf_agent.train_step_counter.numpy()),newline=False)
+        rlxout.printNotice('Episodes:     %i' % (      num_episodes.result().numpy()),newline=False)
+        rlxout.printNotice('Env. Steps:   %i' % (         env_steps.result().numpy()),newline=False)
+        rlxout.printNotice('Train Steps:  %i' % (tf_agent.train_step_counter.numpy()),newline=False)
 
-        printNotice('Collect time: [%5.2f]s' % (collect_time))
-        printNotice('Train time:   [%5.2f]s' % (train_time)            ,newline=False)
-        printNotice('TOTAL:        [%5.2f]s' % (time.time()-start_time),newline=False)
+        rlxout.printNotice('Collect time: [%5.2f]s' % (collect_time))
+        rlxout.printNotice('Train time:   [%5.2f]s' % (train_time)            ,newline=False)
+        rlxout.printNotice('TOTAL:        [%5.2f]s' % (time.time()-start_time),newline=False)
 
       # Checkpoint the policy every ckpt_interval iterations
       if (i % ckpt_interval) == 0:
-        printNotice('Saving checkpoint to: ' + ckpt_dir)
+        rlxout.printNotice('Saving checkpoint to: ' + ckpt_dir)
         train_checkpointer.save(global_step)
         #tf_policy_saver.save(ckpt_dir)
 
@@ -395,7 +394,7 @@ def train( config_file
       tf.summary.flush()
 
     if do_profile:
-      printNotice('End profiling.')
+      rlxout.printNotice('End profiling.')
       tf.profiler.experimental.stop()
 
     # Close all
