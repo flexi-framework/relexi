@@ -31,13 +31,13 @@ tests:
     - . venv/bin/activate
     - python -m pip install pdoc tensorflow tf-agents numpy pyyaml matplotlib pytest pytest-cov
   script:
-    - pytest -v --cov=src/relexi/
-    - coverage xml -o reports/coverage.xml
+    - pytest -v --cov=src/relexi/ --cov-report=xml
+    #- coverage xml -o reports/coverage.xml
   artifacts:
     reports:
       coverage_report:
         coverage_format: cobertura
-        path: reports/coverage.xml
+        path: coverage.xml
 
 # ----------------------------------------------------------------------------------------------------------------------------------------------------
 # Stage "deploy": Copies the repository to github
