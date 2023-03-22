@@ -34,11 +34,10 @@ tests:
     - pytest -v --cov=src/relexi/
     - coverage xml -o reports/coverage.xml
   artifacts:
-    paths:
-      - reports/coverage.xml
     reports:
-      cobertura:
-        - reports/coverage.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: reports/coverage.xml
 
 # ----------------------------------------------------------------------------------------------------------------------------------------------------
 # Stage "deploy": Copies the repository to github
