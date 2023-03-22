@@ -29,7 +29,7 @@ tests:
     - python3 -m pip install virtualenv
     - python3 -m virtualenv venv
     - . venv/bin/activate
-    - python -m pip install pdoc tensorflow tf-agents numpy pyyaml matplotlib pytest pytest-cov
+    - python -m pip install pdoc tensorflow tf-agents numpy pyyaml matplotlib pytest pytest-cov sqlite3
   script:
     - pytest -v --cov=src/relexi/ --cov-report=xml
     #- coverage xml -o reports/coverage.xml
