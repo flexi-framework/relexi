@@ -27,8 +27,13 @@ def flatten_dict(dict_in):
   every key in the uppermost level.
   """
   dict_out={}
-  for key in dict_in.keys():
-    dict_out.update(dict_in[key])
+
+  for key,item in dict_in.items():
+    if isinstance(item,dict):
+      dict_out.update(flatten_dict(dict_in[key]))
+    else:
+      dict_out[key] = dict_in[key]
+
   return dict_out
 
 

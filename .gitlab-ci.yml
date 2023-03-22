@@ -1,4 +1,5 @@
 stages:
+  - tests
   - deploy
 
 .template: &defaults_gnu
@@ -16,6 +17,21 @@ stages:
       - build_gnu
     policy: pull
   allow_failure: false
+
+# ----------------------------------------------------------------------------------------------------------------------------------------------------
+# Stage "tests": Runs unit tests
+# ----------------------------------------------------------------------------------------------------------------------------------------------------
+tests:
+  stage: tests
+  tags:
+    - flexitag
+  before_script:
+    - python3 -m pip install virtualenv
+    - python3 -m virtualenv venv
+    - . venv/bin/activate
+    - python -m pip install pdoc tensorflow tf-agents numpy pyyaml matplotlib pytest
+  script:
+    - pytest -v
 
 # ----------------------------------------------------------------------------------------------------------------------------------------------------
 # Stage "deploy": Copies the repository to github
