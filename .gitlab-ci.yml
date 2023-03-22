@@ -31,7 +31,7 @@ tests:
     - . venv/bin/activate
     - python -m pip install pdoc tensorflow tf-agents numpy pyyaml matplotlib pytest pytest-cov
   script:
-    - pytest -v --cov=src/relexi/ --cov-report=xml
+    - pytest -v --cov=src/relexi/ #--cov-report=xml
     #- coverage xml -o reports/coverage.xml
   coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
   artifacts:
