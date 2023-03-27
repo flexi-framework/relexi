@@ -232,7 +232,6 @@ class flexiEnv(py_environment.PyEnvironment):
         run_args = {"rankfile" : self.rankfiles[i] ,"report-bindings" : ""}
         run = MpirunSettings(exe=self.flexi_path, exe_args=args, run_args=run_args)
         run.set_tasks(n_procs)
-        run.set_hostlist(self.hosts[hosts_per_flexi[i,0]:hosts_per_flexi[i,1]+1])
 
         # Create MPMD Settings and start later in single command
         if self.mpi_launch_mpmd:
