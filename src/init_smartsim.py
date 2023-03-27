@@ -6,7 +6,7 @@ import socket
 import subprocess
 
 from smartsim import Experiment
-from smartsim.database import Orchestrator,PBSOrchestrator
+from smartsim.database import Orchestrator
 
 from output import printWarning,printNotice
 from output import printHeader,printBanner,printSmallBanner
@@ -132,7 +132,8 @@ def init_smartsim(port = 6790
             )
 
   elif orchestrator_type.casefold() =="pbs":
-    db = PBSOrchestrator(
+    db = Orchestrator(
+            launcher='pbs',
             port=port,
             db_nodes=num_dbs,
             batch=False, # false if it is launched in an interactive batch job 
