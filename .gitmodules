@@ -1,0 +1,4 @@
+[submodule "sod2d_gitlab"]
+	path = sod2d_gitlab
+	url = git@gitlab.com:LucasBSC21387/sod2d_gitlab.git
+    branch = smartsim
