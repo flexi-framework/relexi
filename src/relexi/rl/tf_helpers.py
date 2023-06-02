@@ -1,4 +1,5 @@
 import tensorflow as tf
+import relexi.io.output as rlxout
 
 def write_metrics(metrics,step,category_name):
   """
@@ -18,7 +19,7 @@ def init_gpus(num_gpus=1,gpu_memory_growth=False):
   gpus = tf.config.experimental.list_physical_devices('GPU')
   if gpus:
     try:
-      printNotice('Found '+str(len(gpus))+' physical GPU(s) on system.')
+      rlxout.printNotice('Found '+str(len(gpus))+' physical GPU(s) on system.')
       # Set Memory growth
       if gpu_memory_growth:
         for gpu in gpus:
@@ -26,25 +27,25 @@ def init_gpus(num_gpus=1,gpu_memory_growth=False):
 
       # Check if enough GPUs available
       if (num_gpus > len(gpus)):
-        printWarning('Requested more GPUs than available on the system. Use '+str(len(gpus))+' GPUs instead.')
+        rlxout.printWarning('Requested more GPUs than available on the system. Use '+str(len(gpus))+' GPUs instead.')
         num_gpus = len(gpus)
 
       # Get Distribution Strategy
       if (num_gpus == 1):
-        printNotice('Running on single GPU. To run on multiple GPUs use commandline argument "-n NUM_GPUS"')
+        rlxout.printNotice('Running on single GPU. To run on multiple GPUs use commandline argument "-n NUM_GPUS"')
         return None
       else:
         devices = []
         for i in range(num_gpus):
           devices.append("/gpu:"+str(i))
 
-        printNotice('Running Mirrored Distribution Strategy on GPUs: '+",".join(devices))
+        rlxout.printNotice('Running Mirrored Distribution Strategy on GPUs: '+",".join(devices))
         return tf.distribute.MirroredStrategy(devices=devices,cross_device_ops=tf.distribute.NcclAllReduce())
 
     except RuntimeError as e:
-      printWarning(e) # Memory growth must be set before GPUs have been initialized
+      rlxout.printWarning(e) # Memory growth must be set before GPUs have been initialized
   else:
-    printWarning('No GPU found on system, Tensorflow will probably run on CPU')
+    rlxout.printWarning('No GPU found on system, Tensorflow will probably run on CPU')
     return None
 
 @tf.function

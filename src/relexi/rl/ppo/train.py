@@ -2,7 +2,7 @@
 
 import relexi.env.flexiEnvSmartSim
 import relexi.rl.models
-import relexi.smartsim.init_smartsim
+import relexi.smartsim.init_smartsim as init_smartsim
 import relexi.io.readin as rlxin
 import relexi.io.output as rlxout
 
@@ -106,7 +106,7 @@ def train( config_file
   ckpt_dir  = base_dir+"/ckpt/"
 
   # Check if all necessary files actually exist
-  missing_files = rlxin.readin.files_exist([executable_path,parameter_file,train_files,eval_files,reward_spectrum_file])
+  missing_files = rlxin.files_exist([executable_path,parameter_file,train_files,eval_files,reward_spectrum_file])
   for item in missing_files:
     rlxout.printWarning("The specified file "+item+" does not exist")
 
