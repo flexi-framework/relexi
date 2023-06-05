@@ -126,11 +126,6 @@ class flexiEnv(py_environment.PyEnvironment):
     if tag:
       self.tag  = [tag+str(i)+'_' for i in range(self.n_envs)]
 
-    # Create Ompen-MPI rankfile
-    #base_path = "/lustre/hpe/ws10/ws10.0/ws/hpchppof-relexi/testcase_philipp" 
-    #print("init, n_envs: ", self.n_envs)
-    #self.rankfiles = self._generate_rankefile_hawk_ompi(self.hosts, self.n_procs_per_node, self.n_envs, n_procs, base_path)
-
     # Startup FLEXI instances inside experiment to get state size
     self.flexi = self._start_flexi(self.exp,self.n_procs,self.n_envs)
 

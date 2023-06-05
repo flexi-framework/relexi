@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 
-import relexi.env.flexiEnvSmartSim
 import relexi.rl.models
-import relexi.smartsim.init_smartsim as init_smartsim
+import relexi.rl.tf_helpers
+import relexi.env.flexiEnvSmartSim
+import relexi.smartsim.init_smartsim
 import relexi.io.readin as rlxin
 import relexi.io.output as rlxout
+from relexi.smartsim.helpers import generate_rankefile_ompi, copy_to_nodes, parser_flexi_parameters
 
 import os
 import sys
@@ -52,7 +54,6 @@ def train( config_file
           ,log_interval = 1
           ,num_procs_per_environment  = 1
           ,num_parallel_environments  = 1
-          #,num_episodes_per_iteration = 10
           ,train_num_epochs           = 5
           ,train_num_iterations       = 1000
           ,train_buffer_capacity      = 1000
@@ -116,28 +117,28 @@ def train( config_file
     tf.config.optimizer.set_jit(True)
 
   # Initialize SmartSim
-  exp, worker_nodes, db, entry_db, is_db_cluster = init_smartsim.init_smartsim(port = smartsim_port
-                                                                             ,num_dbs = smartsim_num_dbs
-                                                                             ,launcher_type = smartsim_launcher
-                                                                             ,orchestrator_type = smartsim_orchestrator
-                                                                             )
+  exp, worker_nodes, db, entry_db, is_db_cluster = relexi.smartsim.init_smartsim.init_smartsim(port = smartsim_port
+                                                                                              ,num_dbs = smartsim_num_dbs
+                                                                                              ,launcher_type = smartsim_launcher
+                                                                                              ,orchestrator_type = smartsim_orchestrator
+                                                                                              )
 
   # generating rankfiles for OpenMPI
   if mpi_launch_mpmd:
     # If all MPI jobs are run with single mpirun command, all jobs are allocated based on single rankfile
-    rank_files = generate_rankefile_hawk_ompi(worker_nodes
-                                             ,n_procs_per_node
-                                             ,n_par_env=1
-                                             ,ranks_per_env=num_parallel_environments*num_procs_per_environment
-                                             )
+    rank_files = generate_rankefile_ompi(worker_nodes
+                                        ,n_procs_per_node
+                                        ,n_par_env=1
+                                        ,ranks_per_env=num_parallel_environments*num_procs_per_environment
+                                        )
 
   else:
     # Otherwise every MPI job gets its own rankfile
-    rank_files = generate_rankefile_hawk_ompi(worker_nodes
-                                             ,n_procs_per_node
-                                             ,num_parallel_environments
-                                             ,num_procs_per_environment
-                                             )
+    rank_files = generate_rankefile_ompi(worker_nodes
+                                        ,n_procs_per_node
+                                        ,num_parallel_environments
+                                        ,num_procs_per_environment
+                                        )
 
   # Copy all local files into local directory, possibly fast RAM-Disk or similar
   # for performance and to reduce Filesystem access
@@ -241,11 +242,11 @@ def train( config_file
       tf.random.set_seed(random_seed) # TF seed
 
     # Instantiate actor net
-    actor_net = relexi.rl.models.models.ActionNetCNN(my_env.observation_spec()
-                                                    ,my_env.action_spec()
-                                                    ,action_std=action_std
-                                                    ,dist_type=dist_type
-                                                    ,debug=debug)
+    actor_net = relexi.rl.models.ActionNetCNN(my_env.observation_spec()
+                                             ,my_env.action_spec()
+                                             ,action_std=action_std
+                                             ,dist_type=dist_type
+                                             ,debug=debug)
     value_net = relexi.rl.models.ValueNetCNN( my_env.observation_spec()
                                              ,debug=debug)
 
@@ -340,18 +341,18 @@ def train( config_file
 
     # Write parameter files to Tensorboard
     tf.summary.text("training_config"
-                   ,rlxin.readin.read_file(config_file,newline='  \n') # TF uses markdown EOL
+                   ,rlxin.read_file(config_file,newline='  \n') # TF uses markdown EOL
                    ,step=starting_iteration)
     tf.summary.text("flexi_config"
-                   ,rlxin.readin.read_file(parameter_file,newline='  \n') # TF uses markdown EOL
+                   ,rlxin.read_file(parameter_file,newline='  \n') # TF uses markdown EOL
                    ,step=starting_iteration)
 
     for i in range(starting_iteration ,train_num_iterations):
 
       if (i % eval_interval) == 0:
         mytime = time.time()
-        collect_trajectories(eval_driver,my_eval_env)
-        write_metrics(eval_metrics,global_step,'MetricsEval')
+        relexi.rl.tf_helpers.collect_trajectories(eval_driver,my_eval_env)
+        relexi.rl.tf_helpers.write_metrics(eval_metrics,global_step,'MetricsEval')
 
         # Plot Energy Spectra to Tensorboard
         if my_eval_env.can_plot:
@@ -361,15 +362,15 @@ def train( config_file
         rlxout.printNotice('Eval average return: %f' % (eval_avg_return.result().numpy()),newline=False)
 
       mytime = time.time()
-      collect_trajectories(collect_driver,my_env)
-      write_metrics(train_metrics,global_step,'MetricsTrain')
+      relexi.rl.tf_helpers.collect_trajectories(collect_driver,my_env)
+      relexi.rl.tf_helpers.write_metrics(train_metrics,global_step,'MetricsTrain')
       collect_time = time.time()-mytime
 
       mytime = time.time()
       if strategy:
-        train_agent_distributed(tf_agent,replay_buffer,strategy)
+        relexi.rl.tf_helpers.train_agent_distributed(tf_agent,replay_buffer,strategy)
       else:
-        train_agent(tf_agent,replay_buffer)
+        relexi.rl.tf_helpers.train_agent(tf_agent,replay_buffer)
       train_time = time.time()-mytime
 
       # Log to console every log_interval iterations

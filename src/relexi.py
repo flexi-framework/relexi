@@ -66,7 +66,10 @@ def parse_commandline_flags():
   return args
 
 
-def main():
+def main(argv):
+  # Start time
+  start_time = time.time()
+
   # Parse Commandline arguments
   args = parse_commandline_flags()
 
@@ -104,5 +107,4 @@ def main():
 
 if __name__ == "__main__":
   # Multiprocessing wrapper of main function from tf-agent
-  #multiprocessing.handle_main(functools.partial(app.run, main))
-  main()
+  multiprocessing.handle_main(functools.partial(app.run, main))

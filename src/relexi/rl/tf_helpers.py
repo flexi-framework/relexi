@@ -1,5 +1,6 @@
 import tensorflow as tf
 import relexi.io.output as rlxout
+import relexi.smartsim.helpers
 
 def write_metrics(metrics,step,category_name):
   """
@@ -96,7 +97,7 @@ def collect_trajectories(driver,env):
   # Stop FLEXI instances
   env.stop()
   # Cleanup OMP files
-  clean_ompi_tmpfiles()
+  relexi.smartsim.helpers.clean_ompi_tmpfiles()
   return
 
 @tf.function
