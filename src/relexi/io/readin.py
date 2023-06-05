@@ -3,16 +3,19 @@
 import os
 import yaml
 
-"""
-This module contains some helper functions for reading files,
-especially the YAML-based configuration file.
-"""
+""" This module contains some helper functions for reading files, especially the YAML-based configuration file. """
 
-def read_config(config_file,flatten=True):
+def read_config(file_in,flatten=True):
+  """Read a YAML-file.
+
+  Args:
+    file_in (str): Path to the file to read.
+    flatten (bool): (Optional.) Flag to remove uppermost hierarchy of keys.
+
+  Returns:
+    dict: Dictionary containing the contents of the file
   """
-  Readin the YAML-file config_filei. If flatten=True, remove uppermost level keys.
-  """
-  with open(config_file, 'r') as stream:
+  with open(file_in, 'r') as stream:
     config = yaml.safe_load(stream)
 
   if flatten:
@@ -22,19 +25,33 @@ def read_config(config_file,flatten=True):
 
 
 def flatten_dict(dict_in):
-  """
-  Remove the uppermost level of keys by concatenating the individual dicts of
-  every key in the uppermost level.
+  """Recusively converts a nested dictionary of arbitrary depth to a concatenated dictionary.
+
+  Arguments:
+    dict_in (dict): Possibly nested dictionary which will be flattened to a single level of hierarchy.
+
+  Returns:
+    dict: Returns the flattened dictionary.
   """
   dict_out={}
-  for key in dict_in.keys():
-    dict_out.update(dict_in[key])
+
+  for key,item in dict_in.items():
+    if isinstance(item,dict):
+      dict_out.update(flatten_dict(dict_in[key]))
+    else:
+      dict_out[key] = dict_in[key]
+
   return dict_out
 
 
 def flatten_list(list_in):
-  """
-  Recusively converts a nested list of arbitrary depth to a concatenated 1D list.
+  """Recusively converts a nested list of arbitrary depth to a concatenated 1D list.
+
+  Arguments:
+    list_in (list): Possibly nested list which will be flattened to a concatenated 1D list.
+
+  Returns:
+    list: Returns the flattened 1D list.
   """
   list_out = []
 
@@ -48,10 +65,17 @@ def flatten_list(list_in):
 
 
 def read_file(filename,newline=None):
-  """
-  Reads a text file 'filename' and dumps all lines into a single string, while
-  retaining the newline characters. If present, the newline character '\n' can
-  be replaced by the string "newline", if specified.
+  r"""Reads a text file and dumps all lines into a single string.
+
+  Reads a text file and dumps all lines into a single string, while retaining the newline characters.
+  If present, the newline character `\n` can be replaced by the string `"newline"`, if specified.
+
+  Args:
+    filename (str): Path to file that should be read (relative or absolute).
+    newline (str): (Optional.) All occurences of `\n` will be replaced with this string, if specified.
+
+  Returns:
+    str: Returns single string with the content of the file.
   """
   with open(filename,'r') as myfile:
     data = myfile.read()
@@ -63,9 +87,17 @@ def read_file(filename,newline=None):
 
 
 def files_exist(files):
-  """
-  Checks whether all files in the (nested) list 'files' actually exist and
-  returns a list of all files, which do not exist.
+  """Check whether list of files exist.
+
+  Checks whether all files with their paths specified in a (nested) list actually exist amd returns a list
+  of all files, which do not exist.
+
+  Args:
+    files (list): Nested list of filepaths.
+
+  Returns:
+    list: List of filepaths that could not be found. Returns an empty list, if all files were found.
+
   """
   # Flatten list to single dimension
   files_flatten = flatten_list(files)
