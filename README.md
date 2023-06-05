@@ -4,9 +4,13 @@ Relexi is a Reinforcement Learning (RL) framework developed for the high-order H
 However, Relexi is developed with modularity in mind and allows to used with other HPC solvers as well.
 Relexi builds upon TensorFlow and its RL extension TF-Agents.
 For the efficient communication, data handling and the managment of the simulations runs on HPC systems, Relexi uses the SmartSim package with its SmartRedis communication clients.
-For details on the scaling behavior and some use cases, please see
-* [Kurz, M., Offenhäuser, P., Viola, D., Shcherbakov, O., Resch, M., & Beck, A. (2022). Deep Reinforcement Learning for Computational Fluid Dynamics on HPC Systems. arXiv preprint arXiv:2205.06502.](https://arxiv.org/pdf/2206.11038.pdf)
-* [Kurz, M., Offenhäuser, P., & Beck, A. (2022). Deep Reinforcement Learning for Turbulence Modeling in Large Eddy Simulations. arXiv preprint arXiv:2206.11038.](https://arxiv.org/pdf/2205.06502.pdf)
+For details on its scaling behavior, suitability for HPC and for use cases, please see
+* [Kurz, M., Offenhäuser, P., Viola, D., Resch, M., & Beck, A. (2022). Relexi—A scalable open source reinforcement learning framework for high-performance computing. Software Impacts, 14, 100422.](https://www.sciencedirect.com/science/article/pii/S2665963822001063)
+* [Kurz, M., Offenhäuser, P., Viola, D., Shcherbakov, O., Resch, M., & Beck, A. (2022). Deep Reinforcement Learning for Computational Fluid Dynamics on HPC Systems. Journal of Computational Science, 65, 101884.](https://www.sciencedirect.com/science/article/pii/S1877750322002435)
+* [Kurz, M., Offenhäuser, P., & Beck, A. (2023). Deep reinforcement learning for turbulence modeling in large eddy simulations. International Journal of Heat and Fluid Flow, 99, 109094.](https://arxiv.org/pdf/2206.11038)
+
+This is a scientific project.
+If you use Relexi or find it helpful, please cite the project using a suitable reference from the list above referring to either the general Relexi project, its HPC aspects or its application for scientific modeling tasks, respectively.
 
 # Installation
 
