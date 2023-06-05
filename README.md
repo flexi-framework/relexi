@@ -53,16 +53,31 @@ Please be ware that The major dependencies (SmartSim, TensorFlow, FLEXI) might h
 
 * Then install the necessary dependecies
     ```
-    python3 -m pip install smartredis cmake tensorflow tf-agents pyyaml
+    python3 -m pip install smartredis cmake tensorflow tf-agents pyyaml matplotlib
     ```
 
 ### Install SmartSim
+The installation commands were changed in SmartSim version `0.4.0`. So use the following commands depending on the version you want to use.
+
+#### SmartSim 0.3.2
 * Now, install SmartSim in version `0.3.2`. For this, first the package has to be installed via pip and then we can install it using the smart tool provided by SmartSim.
     ```
     pip install smartsim==0.3.2
     smart --clobber
     smart --clean
     smart --no_tf --no_pt -v
+    SMARTSIM_DIR=$(smart --site)
+    export PATH=$PATH:$SMARTSIM_DIR/_core/bin
+    export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${SMARTSIM_DIR}/_core/lib
+    ```
+
+#### SmartSim >= 0.4.0
+* Now, install SmartSim in version you like. The following commands install the latest version. The individual tools of the `smart` command line tool are now not longer prefixed by a double dash.
+    ```
+    pip install smartsim
+    smart clobber
+    smart clean
+    smart build --no_tf --no_pt -v
     SMARTSIM_DIR=$(smart --site)
     export PATH=$PATH:$SMARTSIM_DIR/_core/bin
     export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${SMARTSIM_DIR}/_core/lib
