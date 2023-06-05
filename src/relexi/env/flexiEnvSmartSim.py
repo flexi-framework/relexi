@@ -6,7 +6,7 @@ import time
 import random
 import numpy as np
 
-from output import printWarning
+import relexi.io.output as rlxout
 
 from tf_agents.specs import array_spec
 from tf_agents.environments import py_environment
@@ -24,7 +24,7 @@ try:
   MATPLOTLIB_FOUND = True
 except ImportError:
   MATPLOTLIB_FOUND = False
-  printWarning('Could not import Matplotlib. No figures will be created!')
+  rlxout.printWarning('Could not import Matplotlib. No figures will be created!')
 
 if MATPLOTLIB_FOUND:
   import io
@@ -88,8 +88,8 @@ class flexiEnv(py_environment.PyEnvironment):
     # Sanity Check Launcher
     self.env_launcher = env_launcher
     if ((self.env_launcher == 'local') and (n_procs != 1)):
-      printWarning("For env_launcher 'local', only single execution is allowed! Setting 'n_procs=1'!")
-      printWarning("To run evironments in parallel with MPI, use env_launcher='mpi'!")
+      rlxout.printWarning("For env_launcher 'local', only single execution is allowed! Setting 'n_procs=1'!")
+      rlxout.printWarning("To run evironments in parallel with MPI, use env_launcher='mpi'!")
       n_procs = 1
 
     if (self.env_launcher == 'mpirun'):
@@ -125,11 +125,6 @@ class flexiEnv(py_environment.PyEnvironment):
     # Build tag from tag plus env number
     if tag:
       self.tag  = [tag+str(i)+'_' for i in range(self.n_envs)]
-
-    # Create Ompen-MPI rankfile
-    #base_path = "/lustre/hpe/ws10/ws10.0/ws/hpchppof-relexi/testcase_philipp" 
-    #print("init, n_envs: ", self.n_envs)
-    #self.rankfiles = self._generate_rankefile_hawk_ompi(self.hosts, self.n_procs_per_node, self.n_envs, n_procs, base_path)
 
     # Startup FLEXI instances inside experiment to get state size
     self.flexi = self._start_flexi(self.exp,self.n_procs,self.n_envs)
@@ -196,8 +191,8 @@ class flexiEnv(py_environment.PyEnvironment):
     ranks_avail  = self.n_procs_per_node*len(self.hosts)
     ranks_needed = n_envs*n_procs
     if (ranks_needed > ranks_avail):
-      printWarning(f'Only {ranks_avail} ranks are available, but {ranks_needed} would be required '+
-                    'to start {n_envs} on {n_procs} each.')
+      rlxout.printWarning(f'Only {ranks_avail} ranks are available, but {ranks_needed} would be required '+
+                           'to start {n_envs} on {n_procs} each.')
 
     # Distribute ranks to instances in a round robin fashion
     # TODO: Get ranks directly from hostfile for PBS Orchestrator
@@ -345,7 +340,7 @@ class flexiEnv(py_environment.PyEnvironment):
       try:
         data = self.client.get_tensor(tag+"U")
       except:
-        printWarning("Did not get U in "+tag)
+        rlxout.printWarning("Did not get U in "+tag)
       self.client.delete_tensor(tag+"U")
       # Account for Fortran/C memory layout and 32bit for TF
       data = np.transpose(data)
