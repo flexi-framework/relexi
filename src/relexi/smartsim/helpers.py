@@ -91,14 +91,25 @@ def clean_ompi_tmpfiles():
 
 
 def copy_to_nodes(my_files, base_path, hosts, subfolder=None):
-  """
-  This routine takes the files given in [my_files] and copies them
-  to 'base_path' on the ssh targets 'hosts' via the scp command.
-  If the path does not exists, it tries to create it via 'mkdir'.
-  A optional 'subfolder' can be given, which will be appended to
-  the 'base_path'.
-  TODO: Implement a fail-safe, i.e. only overwite filepaths for
-        which copying worked.
+  """Copy files to local disk storage on allocated nodes.
+
+  This routine takes the files given in `my_files` and copies them
+  to `base_path` on the ssh targets `hosts` via the `scp` command.
+  If the path does not exists, it tries to create it via `mkdir`.
+  An optional `subfolder` can be given, which will be appended to
+  the `base_path`.
+
+  Args:
+    my_files (list): List of path names to the files that are copied.
+    base_path (list): Folder on the hosts to which the files should be copied.
+    hosts (list): List of hosts that are the ssh targets.
+    subfolder (str): (Optional.)
+
+  Return:
+    list: list of paths to files on hosts
+
+  TODO:
+    Implement a fail-safe, i.e. only overwite filepaths for which copying worked.
   """
 
   # If input not a list, i.e. a single element, transform into list
