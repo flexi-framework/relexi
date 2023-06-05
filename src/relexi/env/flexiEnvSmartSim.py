@@ -418,8 +418,8 @@ class flexiEnv(py_environment.PyEnvironment):
     # Plot Spectra
     fig = plt.figure(figsize=(6,5))
     k = range(1,kmax+1)
-    plt.plot(k,E_DNS[0:kmax], label='DNS',linestyle='-',LineWidth=2)
-    plt.plot(k,E_LES[0:kmax], label='LES',linestyle='-',LineWidth=2)
+    plt.plot(k,E_DNS[0:kmax], label='DNS',linestyle='-',linewidth=2)
+    plt.plot(k,E_LES[0:kmax], label='LES',linestyle='-',linewidth=2)
     plt.xlabel('k', fontsize=21)
     plt.ylabel(r'$E_{kin}$',fontsize=21)
     plt.xscale("log")
