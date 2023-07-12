@@ -1,3 +1,6 @@
+import os
+import shutil
+
 def generate_rankefile_hawk_ompi(hosts: list, cores_per_node: int, n_par_env: int, ranks_per_env: int, base_path=None):
   """Generate rank file for openmpi process binding
   :param host: list of hosts
