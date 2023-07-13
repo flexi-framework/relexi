@@ -13,7 +13,7 @@ from tf_agents.environments import py_environment
 from tf_agents.trajectories import time_step as ts
 
 from smartsim import Experiment
-from smartsim.database import PBSOrchestrator,Orchestrator
+from smartsim.database import Orchestrator
 from smartsim.settings import MpirunSettings,RunSettings
 
 from smartredis import Client
