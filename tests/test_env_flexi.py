@@ -4,14 +4,17 @@ from .context import relexi
 import relexi.env.flexiEnvSmartSim as rlxenv
 from smartsim import Experiment
 from unittest.mock import patch
+#from mock import patch
 import os.path
+from relexi.env.flexiEnvSmartSim import Client
 
 """ Contains pytest - tests for the functionalities of the relexi.env.flexiEnv module """
 
 @patch.object(rlxenv.flexiEnv,'_start_flexi')
 @patch.object(rlxenv.flexiEnv,'_get_current_state')
 @patch.object(rlxenv.flexiEnv,'_end_flexi')
-def init_flexi_env(mock__start_flexi, mock__get_current_state, mock__end_flexi):
+@patch('relexi.env.flexiEnvSmartSim.Client')
+def init_flexi_env(mock__start_flexi, mock__get_current_state, mock__end_flexi, mock_Client):
 
     smartsim_port = 6780
     smartsim_num_dbs = 1
