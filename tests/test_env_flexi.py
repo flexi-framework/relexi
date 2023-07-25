@@ -4,7 +4,6 @@ from .context import relexi
 import relexi.env.flexiEnvSmartSim as rlxenv
 from smartsim import Experiment
 from unittest.mock import patch
-#from mock import patch
 import os.path
 from relexi.env.flexiEnvSmartSim import Client
 
@@ -53,8 +52,6 @@ def init_flexi_env(mock__start_flexi, mock__get_current_state, mock__end_flexi, 
     is_db_cluster = False
 
     exp = Experiment("flexi", launcher=smartsim_launcher)
-
-    print(type(exp))
 
     flexi_env = rlxenv.flexiEnv(exp
                                ,executable_path
