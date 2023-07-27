@@ -24,15 +24,15 @@ The main dependencies of Relexi are listed in the following with their supported
 | Package          | Version       | Note     | 
 |:-----------------|--------------:|:---------|
 | Python           |     ≥3.8      |          |
-| TensorFlow       |      2.9      |          |
-| TF-Agents        |      0.13     |          |
-| SmartSim         |      0.3.2    |          |
-| SmartRedis       |      0.2      |          |
+| TensorFlow       |     ≥2.9      |          |
+| TF-Agents        |     ≥0.13     |          |
+| SmartSim         |     ≥0.3.2    |          |
+| SmartRedis       |      0.2.0    |          |
 | Cmake            |     ≥3.0      |          |
 | Make             |     ≥4.0      |          |
-| gcc-fortran      |      9.4      | GCC ≥10 not supported yet by all deps  |
-| gcc              |      9.4      |          |
-| gcc-c++          |      9.4      |          |
+| gcc-fortran      |     ≥9.4      | GCC-10 not supported! (GCC-11 and higher is fine) |
+| gcc              |     ≥9.4      |          |
+| gcc-c++          |     ≥9.4      |          |
 
 Please be ware that The major dependencies (SmartSim, TensorFlow, FLEXI) might have a more expansive dependency tree, for which we refer the user to the corresponding documentation for details.
 
@@ -82,7 +82,7 @@ The installation commands were changed in SmartSim version `0.4.0`. So use the f
     smart clobber
     smart clean
     smart build --no_tf --no_pt -v
-    SMARTSIM_DIR=$(smart --site)
+    SMARTSIM_DIR=$(smart site)
     export PATH=$PATH:$SMARTSIM_DIR/_core/bin
     export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${SMARTSIM_DIR}/_core/lib
     ```
