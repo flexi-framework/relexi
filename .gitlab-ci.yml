@@ -1,5 +1,5 @@
 stages:
-  #- tests
+  - tests
   - deploy
 
 .template: &defaults_gnu
@@ -23,6 +23,7 @@ stages:
 # ----------------------------------------------------------------------------------------------------------------------------------------------------
 tests:
   stage: tests
+  when: manual # Only triggered manually in GUI
   tags:
     - flexitag
   before_script:
