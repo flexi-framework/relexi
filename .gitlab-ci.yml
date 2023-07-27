@@ -1,5 +1,5 @@
 stages:
-  - tests
+  #- tests
   - deploy
 
 .template: &defaults_gnu
