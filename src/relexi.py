@@ -3,6 +3,8 @@
 import relexi.io.output as rlxout
 import relexi.io.readin as rlxin
 import relexi.rl.ppo    as rlxppo
+from relexi.rl.tf_helpers import init_gpus
+from tf_agents.system import multiprocessing
 
 import os
 import time
@@ -65,6 +67,9 @@ def parse_commandline_flags():
 
 
 def main(argv):
+  # Start time
+  start_time = time.time()
+
   # Parse Commandline arguments
   args = parse_commandline_flags()
 
@@ -91,10 +96,10 @@ def main(argv):
     os.environ["SMARTSIM_LOG_LEVEL"] = "debug" # All available Output
 
   # Parse Config file
-  config = readin.read_config(args.config_file)
+  config = rlxin.read_config(args.config_file)
 
   # Start training with the parameters of config, which are passed to the function as dict.
-  rlxppo.train.train(debug=args.debug,config_file=args.config_file,**config,strategy=strategy)
+  rlxppo.train(debug=args.debug,config_file=args.config_file,**config,strategy=strategy)
 
   # Finalize Training
   rlxout.printBanner('Sucessfully finished after: [%8.2f]s' % (time.time()-start_time))

@@ -44,6 +44,21 @@ tests:
 # ----------------------------------------------------------------------------------------------------------------------------------------------------
 # Stage "deploy": Copies the repository to github
 # ----------------------------------------------------------------------------------------------------------------------------------------------------
+#documentation:
+#  stage: deploy
+#  tags:
+#    - flexitag
+#      #rules:
+#      #  - if: '$DO_DEPLOY && $CI_SERVER_URL =~ /.*\.iag\.uni-stuttgart\.de$/'
+#  before_script:
+#    - python3 -m pip install virtualenv
+#    - python3 -m virtualenv venv
+#    - . venv/bin/activate
+#    - python -m pip install pdoc tensorflow tf-agents numpy pyyaml matplotlib
+#  script:
+#    - cd docs
+#    - bash build_docs.sh
+
 github:
   stage: deploy
   tags:
@@ -52,3 +67,4 @@ github:
     - if: '$DO_DEPLOY && $CI_SERVER_URL =~ /.*\.iag\.uni-stuttgart\.de$/'
   script:
     - git clone --single-branch git@gitlab.iag.uni-stuttgart.de:flexi/codes/relexi.git relexi_github ; cd relexi_github ; git push --mirror git@github.com:flexi-framework/relexi.git ; cd ../
+

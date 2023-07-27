@@ -13,7 +13,7 @@ from tf_agents.environments import py_environment
 from tf_agents.trajectories import time_step as ts
 
 from smartsim import Experiment
-from smartsim.database import PBSOrchestrator,Orchestrator
+from smartsim.database import Orchestrator
 from smartsim.settings import MpirunSettings,RunSettings
 
 from smartredis import Client
@@ -126,11 +126,6 @@ class flexiEnv(py_environment.PyEnvironment):
     if tag:
       self.tag  = [tag+str(i)+'_' for i in range(self.n_envs)]
 
-    # Create Ompen-MPI rankfile
-    #base_path = "/lustre/hpe/ws10/ws10.0/ws/hpchppof-relexi/testcase_philipp" 
-    #print("init, n_envs: ", self.n_envs)
-    #self.rankfiles = self._generate_rankefile_hawk_ompi(self.hosts, self.n_procs_per_node, self.n_envs, n_procs, base_path)
-
     # Startup FLEXI instances inside experiment to get state size
     self.flexi = self._start_flexi(self.exp,self.n_procs,self.n_envs)
 
@@ -232,7 +227,6 @@ class flexiEnv(py_environment.PyEnvironment):
         run_args = {"rankfile" : self.rankfiles[i] ,"report-bindings" : ""}
         run = MpirunSettings(exe=self.flexi_path, exe_args=args, run_args=run_args)
         run.set_tasks(n_procs)
-        run.set_hostlist(self.hosts[hosts_per_flexi[i,0]:hosts_per_flexi[i,1]+1])
 
         # Create MPMD Settings and start later in single command
         if self.mpi_launch_mpmd:
@@ -424,8 +418,8 @@ class flexiEnv(py_environment.PyEnvironment):
     # Plot Spectra
     fig = plt.figure(figsize=(6,5))
     k = range(1,kmax+1)
-    plt.plot(k,E_DNS[0:kmax], label='DNS',linestyle='-',LineWidth=2)
-    plt.plot(k,E_LES[0:kmax], label='LES',linestyle='-',LineWidth=2)
+    plt.plot(k,E_DNS[0:kmax], label='DNS',linestyle='-',linewidth=2)
+    plt.plot(k,E_LES[0:kmax], label='LES',linestyle='-',linewidth=2)
     plt.xlabel('k', fontsize=21)
     plt.ylabel(r'$E_{kin}$',fontsize=21)
     plt.xscale("log")
