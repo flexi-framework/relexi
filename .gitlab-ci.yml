@@ -1,4 +1,5 @@
 stages:
+  - tests
   - deploy
 
 .template: &defaults_gnu
@@ -16,6 +17,29 @@ stages:
       - build_gnu
     policy: pull
   allow_failure: false
+
+# ----------------------------------------------------------------------------------------------------------------------------------------------------
+# Stage "tests": Runs unit tests
+# ----------------------------------------------------------------------------------------------------------------------------------------------------
+tests:
+  stage: tests
+  when: manual # Only triggered manually in GUI
+  tags:
+    - flexitag
+  before_script:
+    - python3 -m pip install virtualenv
+    - python3 -m virtualenv venv
+    - . venv/bin/activate
+    - python -m pip install pdoc tensorflow tf-agents numpy pyyaml matplotlib pytest pytest-cov
+  script:
+    - pytest -v #--cov=src/relexi/ #--cov-report=xml
+    #- coverage xml -o reports/coverage.xml
+  coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
 
 # ----------------------------------------------------------------------------------------------------------------------------------------------------
 # Stage "deploy": Copies the repository to github

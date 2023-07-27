@@ -6,7 +6,7 @@ import relexi.env.flexiEnvSmartSim
 import relexi.smartsim.init_smartsim
 import relexi.io.readin as rlxin
 import relexi.io.output as rlxout
-from relexi.smartsim.helpers import generate_rankefile_ompi, copy_to_nodes, parser_flexi_parameters
+from relexi.smartsim.helpers import generate_rankfile_ompi, copy_to_nodes, parser_flexi_parameters
 
 import os
 import sys
@@ -126,19 +126,19 @@ def train( config_file
   # generating rankfiles for OpenMPI
   if mpi_launch_mpmd:
     # If all MPI jobs are run with single mpirun command, all jobs are allocated based on single rankfile
-    rank_files = generate_rankefile_ompi(worker_nodes
-                                        ,n_procs_per_node
-                                        ,n_par_env=1
-                                        ,ranks_per_env=num_parallel_environments*num_procs_per_environment
-                                        )
+    rank_files = generate_rankfile_ompi(worker_nodes
+                                       ,n_procs_per_node
+                                       ,n_par_env=1
+                                       ,ranks_per_env=num_parallel_environments*num_procs_per_environment
+                                       )
 
   else:
     # Otherwise every MPI job gets its own rankfile
-    rank_files = generate_rankefile_ompi(worker_nodes
-                                        ,n_procs_per_node
-                                        ,num_parallel_environments
-                                        ,num_procs_per_environment
-                                        )
+    rank_files = generate_rankfile_ompi(worker_nodes
+                                       ,n_procs_per_node
+                                       ,num_parallel_environments
+                                       ,num_procs_per_environment
+                                       )
 
   # Copy all local files into local directory, possibly fast RAM-Disk or similar
   # for performance and to reduce Filesystem access
