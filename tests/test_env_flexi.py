@@ -1,4 +1,4 @@
-# #!/usr/bin/env python3
+#!/usr/bin/env python3
 
 from .context import relexi
 import relexi.env.flexiEnvSmartSim as rlxenv
@@ -45,7 +45,7 @@ def init_flexi_env(mock__start_flexi, mock__get_current_state, mock__end_flexi, 
     smartsim_orchestrator = "local"
     smartsim_launcher = "local"
     entry_db="127.0.0.1"
-    worker_nodes = ["r1c1t1n1","r1c1t1n2","r1c1t1n3","r1c1t1n4"] 
+    worker_nodes = ["r1c1t1n1","r1c1t1n2","r1c1t1n3","r1c1t1n4"]
     reward_spectrum_file = "./examples/HIT_24_DOF/simulation_files/DNS_spectrum_stats_t2_to_t10.csv"
     parameter_file = "parameter.ini"
     executable_path = "/flexi-extensions/build/bin/flexi"
@@ -74,25 +74,25 @@ def init_flexi_env(mock__start_flexi, mock__get_current_state, mock__end_flexi, 
                                ,env_launcher     = env_launcher
                                ,debug            = debug
                                )
-    
+
     return flexi_env
 
 @patch('os.path.isfile')
 @patch('os.access')
 @patch.object(Experiment, 'start')
 def test_envFlexi_start_flexi(mock_isfile, mock_access, mock_start):
-    
+
     n_envs_expected = 8
     exe_expected = "/flexi-extensions/build/bin/flexi"
     exe_args_expected = ['parameter.ini','./simulation_files/run_f200_N5_4Elems_State_0000003.000000000.h5', '--tag', 'eval']
-    run_args_expected = {'rankfile': '/my/dummy/rankfile_0', 'report-bindings': '', 'n': 8, 'host': 'r1c1t1n'}
+    run_args_expected = {'rankfile': '/my/dummy/rankfile_0', 'report-bindings': '', 'n': 8}
 
     flexi_env = init_flexi_env()
     flexi = flexi_env._start_flexi(flexi_env.exp, flexi_env.n_procs, flexi_env.n_envs )
 
     n_envs = len(flexi)
     assert n_envs == n_envs_expected, f"Wrong number of models"
-    
+
     j = 0
     k = 1
     for model in flexi:

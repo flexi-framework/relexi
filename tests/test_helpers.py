@@ -5,7 +5,7 @@ import relexi.smartsim.helpers as rlxhelpers
 
 """ Contains pytest - tests for the functionalities of the relexi.smartsim.helpers module """
 
-def test_generate_rankefile_hawk_ompi(tmp_path):
+def test_generate_rankfile_ompi(tmp_path):
     
     hosts = ["r1n1c1n1", "r1n1c1n2"]
     cores_per_node = 4
@@ -20,7 +20,7 @@ def test_generate_rankefile_hawk_ompi(tmp_path):
     expected.append("rank 0=r1n1c1n2 slot=0\nrank 1=r1n1c1n2 slot=1")
     expected.append("rank 0=r1n1c1n2 slot=2\nrank 1=r1n1c1n2 slot=3")
 
-    rankfiles_out = rlxhelpers.generate_rankefile_hawk_ompi(hosts, cores_per_node, n_par_env, ranks_per_env, base_path)
+    rankfiles_out = rlxhelpers.generate_rankfile_ompi(hosts, cores_per_node, n_par_env, ranks_per_env, base_path)
     
     i = 0
     for rankfile in rankfiles_out:
