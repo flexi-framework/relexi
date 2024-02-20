@@ -1,6 +1,11 @@
+![logo](https://numericsresearchgroup.org/images/icons/relexi.svg "RELEXI")
+
+[![license](https://img.shields.io/github/license/flexi-framework/relexi.svg?maxAge=2592000 "GPL-3.0 License")](LICENSE.md)
+[![doi](https://img.shields.io/badge/DOI-10.1016/j.simpa.2022.100422-blue "DOI")](https://doi.org/10.1016/j.simpa.2022.100422)
+
 # About Relexi
 
-Relexi is a Reinforcement Learning (RL) framework developed for the high-order HPC flow solver FLEXI.
+Relexi is a Reinforcement Learning (RL) framework developed for the high-order HPC flow solver [FLEXI][flexi].
 However, Relexi is developed with modularity in mind and allows to used with other HPC solvers as well.
 Relexi builds upon TensorFlow and its RL extension TF-Agents.
 For the efficient communication, data handling and the managment of the simulations runs on HPC systems, Relexi uses the SmartSim package with its SmartRedis communication clients.
@@ -107,7 +112,7 @@ The installation commands were changed in SmartSim version `0.4.0`. So use the f
     ```
 
 ### Install FLEXI
-* Clone the required version of FLEXI from GitHub and build FLEXI with the standard compile flags
+* Clone the required version of FLEXI from GitHub and build it with the standard compile flags
     ```
     cd $ROOTDIR
     git clone https://github.com/flexi-framework/flexi-extensions.git
@@ -117,7 +122,7 @@ The installation commands were changed in SmartSim version `0.4.0`. So use the f
     cmake .. -DLIBS_BUILD_HDF5=ON -DLIBS_USE_MPI=OFF -DLIBS_USE_SMARTREDIS=ON -DLIBS_USE_FFTW=ON -DPOSTI=OFF -DFLEXI_TESTCASE=hit -DFLEXI_NODETYPE=GAUSS-LOBATTO -DFLEXI_SPLIT_DG=ON -DFLEXI_EDDYVISCOSITY=ON
     make -j
     ```
-* This compiles FLEXI without MPI and thus in its serial version. To enable MPI or to change the configuration of FLEXI, please see the official documentation of FLEXI
+* This compiles FLEXI without MPI and thus in its serial version. To enable MPI or to change the configuration of FLEXI, please see the [official documentation][userguide] of FLEXI.
 
 ### Install Relexi
 * Finally, we can clone the Relexi repository.
@@ -149,3 +154,7 @@ The installation commands were changed in SmartSim version `0.4.0`. So use the f
     ```
     ssh -L 6006:127.0.0.1:6006 your_remote_server
     ```
+
+[nrg]:       https://numericsresearchgroup.org/index.html
+[flexi]:     https://numericsresearchgroup.org/flexi_index.html
+[userguide]: https://numericsresearchgroup.org/userguide/userguide.pdf
