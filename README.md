@@ -17,6 +17,25 @@ For details on its scaling behavior, suitability for HPC and for use cases, plea
 This is a scientific project.
 If you use Relexi or find it helpful, please cite the project using a suitable reference from the list above referring to either the general Relexi project, its HPC aspects or its application for scientific modeling tasks, respectively.
 
+# Documentation
+
+The documentation of Relexi is built via `pdoc`, which can be installed via `pip install pdoc`.
+Next, change into the `docs` folder and build the documentation via
+    ```
+    cd docs
+    bash build_docs.sh
+    ```
+Open the resulting `relexi.html` with your browser.
+
+# Testing
+
+A suite of unit tests are implemented for Relexi using the `pytest` testing environment.
+To run the tests, simply execute in the root directory
+    ```
+    pytest
+    ```
+
+
 # Installation
 
 The following quick start details a standard installation of the Relexi framework.
