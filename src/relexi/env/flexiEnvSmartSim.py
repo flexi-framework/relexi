@@ -325,7 +325,7 @@ class flexiEnv(py_environment.PyEnvironment):
     # TODO: make this a user parameter
     action_mod = action * 0.5
     for i in range(self.n_envs):
-      dataset = self.client.put_tensor(self.tag[i]+"Cs",action_mod[i,::].astype(np.float64))
+      dataset = self.client.put_tensor(self.tag[i]+"actions",action_mod[i,::].astype(np.float64))
 
 
   def _get_current_state(self):
@@ -334,13 +334,14 @@ class flexiEnv(py_environment.PyEnvironment):
     ATTENTION: This is the routine the enviroment will idle until the necessary data becomes available 
     """
     do_init = True
+    key="state"
     for tag in self.tag:
-      self.client.poll_tensor(tag+"U",10,10000)
+      self.client.poll_tensor(tag+"state",10,10000)
       try:
-        data = self.client.get_tensor(tag+"U")
+        data = self.client.get_tensor(tag+key)
       except:
-        rlxout.printWarning("Did not get U in "+tag)
-      self.client.delete_tensor(tag+"U")
+          rlxout.printWarning("Did not get state from environment "+tag[:-1])
+      self.client.delete_tensor(tag+key)
       # Account for Fortran/C memory layout and 32bit for TF
       data = np.transpose(data)
       data = np.expand_dims(data,axis=0)
@@ -356,10 +357,12 @@ class flexiEnv(py_environment.PyEnvironment):
   def _flexi_ended(self):
     """ Checks whether FLEXI has already ended."""
     has_ended = np.empty((self.n_envs))
+
+    key="step_type"
     for i in range(self.n_envs):
-      self.client.poll_tensor(self.tag[i]+"step_type",10,1000)
-      step_type = self.client.get_tensor(self.tag[i]+"step_type")
-      self.client.delete_tensor(self.tag[i]+"step_type")
+      self.client.poll_tensor(self.tag[i]+key,10,1000)
+      step_type = self.client.get_tensor(self.tag[i]+key)
+      self.client.delete_tensor(self.tag[i]+key)
       if step_type > 0:
         has_ended[i] = False
       else:
@@ -378,11 +381,13 @@ class flexiEnv(py_environment.PyEnvironment):
     """Compute the reward for the agent, based on the current flow state."""
     reward     = np.zeros( (self.n_envs,) )
     self.E_LES = np.zeros( (self.n_envs,self.reward_kmax) )
+
+    key="Ekin"
     for i in range(self.n_envs):
       # Poll Tensor
-      self.client.poll_tensor(self.tag[i]+"Ekin",10,1000)
-      data = self.client.get_tensor(self.tag[i]+"Ekin")
-      self.client.delete_tensor(self.tag[i]+"Ekin")
+      self.client.poll_tensor(self.tag[i]+key,10,1000)
+      data = self.client.get_tensor(self.tag[i]+key)
+      self.client.delete_tensor(self.tag[i]+key)
       self.E_LES[i,:] = data[0:self.reward_kmax]
 
       # Compute Reward
