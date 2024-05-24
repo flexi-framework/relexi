@@ -1,70 +1,104 @@
 stages:
-  - tests
+  - checkin
+  - nightly
   - deploy
 
-.template: &defaults_gnu
-  tags:
-    - flexitag
-  artifacts:
-    name: "${CI_PIPELINE_ID}-${CI_COMMIT_REF_NAME}-${CI_JOB_NAME}"
-    expire_in: 1 day
-    when: on_failure
-    paths:
-      - build_gnu
+# ----------------------------------------------------------------------------------------------------------------------------------------------------
+# Define cached Python environment
+# ----------------------------------------------------------------------------------------------------------------------------------------------------
+default:
   cache:
-    key: "${CI_COMMIT_REF_SLUG}-GNU"
     paths:
-      - build_gnu
-    policy: pull
-  allow_failure: false
+      - .cache/pip
+  before_script:
+    - python -V               # Print out python version for debugging
+    - pip install virtualenv
+    - virtualenv venv
+    - source venv/bin/activate
+    - python -m pip install -r requirements.txt
+    - export GIT_CLONE_PROTECTION_ACTIVE=false
+    - smart clobber && smart clean
+    - smart build --no_pt #--no_tf
+  after_script:
+    - $(smart dbcli) -h 127.0.0.1 -p 6780 shutdown #Shutdown DB manually in any case, even if crashed
+
+variables: # Change pip's cache directory to be inside the project directory since we can only cache local items.
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
 
 # ----------------------------------------------------------------------------------------------------------------------------------------------------
-# Stage "tests": Runs unit tests
+# Stage "tests": Run unit tests
 # ----------------------------------------------------------------------------------------------------------------------------------------------------
-tests:
-  stage: tests
-  when: manual # Only triggered manually in GUI
+unittests:
+  stage: checkin
   tags:
     - flexitag
-  before_script:
-    - python3 -m pip install virtualenv
-    - python3 -m virtualenv venv
-    - . venv/bin/activate
-    - python -m pip install pdoc tensorflow tf-agents numpy pyyaml matplotlib pytest pytest-cov
+    - siegfried # Ensure GPU on system
   script:
-    - pytest -v #--cov=src/relexi/ #--cov-report=xml
-    #- coverage xml -o reports/coverage.xml
+    - pytest --cov=src/relexi/ #--cov-report=xml
+    - coverage xml -o reports/coverage.xml
   coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
   artifacts:
     reports:
       coverage_report:
         coverage_format: cobertura
-        path: coverage.xml
+        path: reports/coverage.xml
+
+# ----------------------------------------------------------------------------------------------------------------------------------------------------
+# Stage "examples": Runs examples
+# ----------------------------------------------------------------------------------------------------------------------------------------------------
+examples:
+  stage: nightly
+  tags:
+    - flexitag
+    - siegfried # Ensure GPU on system
+  rules:
+    - if: '$DO_NIGHTLY && $CI_SERVER_URL =~ /.*\.iag\.uni-stuttgart\.de$/'
+  script:
+    # Build FLEXI
+    - git clone https://github.com/flexi-framework/flexi-extensions.git
+    - cd flexi-extensions
+    - git checkout smartsim
+    - mkdir -p build && cd build
+    - cmake .. -DLIBS_BUILD_HDF5=OFF -DLIBS_USE_MPI=ON -DLIBS_BUILD_SMARTREDIS=ON -DLIBS_USE_SMARTREDIS=ON -DLIBS_USE_FFTW=ON -DPOSTI=OFF -DFLEXI_TESTCASE=hit -DFLEXI_NODETYPE=GAUSS-LOBATTO -DFLEXI_SPLIT_DG=ON -DFLEXI_EDDYVISCOSITY=ON
+    - make -j
+    # Run example 24 DOF
+    - cd ${CI_PROJECT_DIR}/examples/HIT_24_DOF/
+    - sed -i 's#\(executable_path:\).*#\1 ../../flexi-extensions/build/bin/flexi#' prm.yaml #Adapt path to FLEXI executable
+    - sed -i 's#\(num_procs_per_environment:\).*#\1 2#' prm.yaml #Adapt number of proces to accelerate training
+    - sed -i 's#\(env_launcher:\).*#\1 mpirun#' prm.yaml #Adapt launcher to MPI
+    - python3 ${CI_PROJECT_DIR}/src/relexi.py prm.yaml
 
 # ----------------------------------------------------------------------------------------------------------------------------------------------------
 # Stage "deploy": Copies the repository to github
 # ----------------------------------------------------------------------------------------------------------------------------------------------------
-#documentation:
-#  stage: deploy
-#  tags:
-#    - flexitag
-#      #rules:
-#      #  - if: '$DO_DEPLOY && $CI_SERVER_URL =~ /.*\.iag\.uni-stuttgart\.de$/'
-#  before_script:
-#    - python3 -m pip install virtualenv
-#    - python3 -m virtualenv venv
-#    - . venv/bin/activate
-#    - python -m pip install pdoc tensorflow tf-agents numpy pyyaml matplotlib
-#  script:
-#    - cd docs
-#    - bash build_docs.sh
+documentation:
+  stage: deploy
+  tags:
+    - flexitag
+    - siegfried # Ensure GPU on system
+  rules:
+    - if: '$DO_DEPLOY && $CI_SERVER_URL =~ /.*\.iag\.uni-stuttgart\.de$/'
+  script:
+    - cd docs
+    - ./build_docs.sh
+  artifacts:
+    paths:
+      - docs/index.html
+      - docs/relexi.html
+      - docs/search.js
+      - docs/relexi/
 
 github:
   stage: deploy
   tags:
     - flexitag
+    - siegfried # Ensure GPU on system
   rules:
     - if: '$DO_DEPLOY && $CI_SERVER_URL =~ /.*\.iag\.uni-stuttgart\.de$/'
+  dependencies:
+    - documentation
   script:
-    - git clone --single-branch git@gitlab.iag.uni-stuttgart.de:flexi/codes/relexi.git relexi_github ; cd relexi_github ; git push --mirror git@github.com:flexi-framework/relexi.git ; cd ../
-
+    - git clone --single-branch git@gitlab.iag.uni-stuttgart.de:flexi/codes/relexi.git relexi_github
+    - cd relexi_github
+    - git push --mirror git@github.com:flexi-framework/relexi.git
+    - cd ../
