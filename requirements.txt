@@ -1,0 +1,10 @@
+smartsim>=0.4,<0.7
+smartredis
+tensorflow>=2.9,<2.16
+tf-agents
+cmake
+pyyaml
+matplotlib
+pdoc
+pytest
+pytest-cov

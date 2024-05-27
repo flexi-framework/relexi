@@ -2,6 +2,8 @@
 
 [![license](https://img.shields.io/github/license/flexi-framework/relexi.svg?maxAge=2592000 "GPL-3.0 License")](LICENSE.md)
 [![doi](https://img.shields.io/badge/DOI-10.1016/j.simpa.2022.100422-blue "DOI")](https://doi.org/10.1016/j.simpa.2022.100422)
+[![docsbuild](https://img.shields.io/github/deployments/flexi-framework/relexi/github-pages?label=docs%20build)](https://flexi-framework.github.io/relexi/relexi.html)
+[![userguide](https://img.shields.io/badge/Documentation-silver "Documentation")](https://flexi-framework.github.io/relexi/relexi.html)
 
 # About Relexi
 Relexi is a Reinforcement Learning (RL) framework developed for the high-order HPC flow solver [FLEXI][flexi].
@@ -17,24 +19,6 @@ For details on its scaling behavior, suitability for HPC and for use cases, plea
 This is a scientific project.
 If you use Relexi or find it helpful, please cite the project using a suitable reference from the list above referring to either the general Relexi project, its HPC aspects or its application for scientific modeling tasks, respectively.
 
-# Documentation
-The documentation of Relexi is built via `pdoc`, which can be installed via
-```bash
-pip install pdoc
-```
-Next, change into the `docs` folder and build the documentation via
-```bash
-cd docs
-bash build_docs.sh
-```
-Open the resulting `relexi.html` with your browser.
-
-# Testing
-A suite of unit tests is implemented for Relexi using the `pytest` testing environment. To run the tests, simply execute in the root directory
-```bash
-pytest
-```
-
 # Installation
 The following quick start details a standard installation of the Relexi framework.
 
@@ -45,9 +29,9 @@ The main dependencies of Relexi are listed in the following with their supported
 | Package          | Version         | Note                                    |
 |:-----------------|----------------:|:----------------------------------------|
 | Python           |          ≥3.9   |                                         |
-| TensorFlow       |   2.9.0 - 2.15.1|                                         |
+| TensorFlow       |     2.9 - 2.15  |                                         |
 | TF-Agents        |          ≥0.13  |                                         |
-| SmartSim         |   0.4.0 - 0.6.2 |                                         |
+| SmartSim         |     0.4 - 0.6   |                                         |
 | SmartRedis       |          ≥0.4.1 |                                         |
 | CMake            |          ≥3.0   |                                         |
 | Make             |          ≥4.0   |                                         |
@@ -63,30 +47,23 @@ For convenience, save the current directory with
 ```bash
 ROOTDIR=$(pwd)
 ```
-It is highly recommended to use some form of virtual environment for the installation. You can use any tool you like, we use `virtualenv` which can be installed with
+It is highly recommended to use some form of virtual environment for the installation.
+You can use create and activate a new environment using `virtualenv` via
 ```bash
 python3 -m pip install virtualenv
-```
-Create and activate a new environment with
-```bash
 python3 -m virtualenv env_relexi
 source env_relexi/bin/activate
 ```
 Install the necessary dependencies
 ```bash
-python3 -m pip install tensorflow smartredis cmake tf-agents pyyaml matplotlib
+python3 -m pip install -r requirements.txt
 ```
 
 ### Install SmartSim
-Install SmartSim in a supported version ranging from `0.4.0` to `0.6.2`. The following commands install the latest supported version.
+After installing the `smartsim` package via pip, it has to be installed with its dependencies via the `smart` commandline tool:
 ```bash
-pip install smartsim==0.6.2
-smart clobber
-smart clean
-smart build --no_tf --no_pt -v
-SMARTSIM_DIR=$(smart site)
-export PATH=$PATH:$SMARTSIM_DIR/_core/bin
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${SMARTSIM_DIR}/_core/lib
+smart clobber && smart clean
+smart build --no_tf
 ```
 
 ### Install FLEXI
@@ -136,3 +113,22 @@ ssh -L 6006:127.0.0.1:6006 your_remote_server
 [nrg]:       https://numericsresearchgroup.org/index.html
 [flexi]:     https://numericsresearchgroup.org/flexi_index.html
 [userguide]: https://numericsresearchgroup.org/userguide/userguide.pdf
+
+# Documentation
+The documentation of Relexi can be found [here](https://flexi-framework.github.io/relexi/relexi.html).
+It is built with `pdoc`, which can be installed via
+```bash
+pip install pdoc
+```
+with which the documentation can be built with
+```bash
+cd docs
+bash build_docs.sh
+```
+Open the resulting `relexi.html` with your browser.
+
+# Testing
+A suite of unit tests is implemented for Relexi using the `pytest` testing environment. To run the tests, simply execute in the root directory
+```bash
+pytest
+```
