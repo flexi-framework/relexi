@@ -348,7 +348,7 @@ def train( config_file
                     tf.summary.image("Spectra", my_eval_env.plot(), step=global_step)
 
                 rlxout.info(f'Eval time: [{time.time()-mytime:5.2f}s]')
-                rlxout.info(f'Eval average return: {eval_avg_return.result().numpy()}', newline=False)
+                rlxout.info(f'Eval return: {eval_avg_return.result().numpy():.6f}', newline=False)
 
             mytime = time.time()
             relexi.rl.tf_helpers.collect_trajectories(collect_driver,my_env)
