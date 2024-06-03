@@ -88,7 +88,7 @@ def train( config_file
 
     # Else, use current time stamp
     else:
-        base_dir = datetime.now().strftime('%d%m%y_%H%M%S')
+        base_dir = datetime.datetime.now().strftime('%d%m%y_%H%M%S')
         base_dir = "logs/"+base_dir
 
     # Set all output directories of the run accordingly
