@@ -4,18 +4,10 @@
 
 import os
 import time
+import datetime
 import random
 import copy
 import contextlib
-from datetime import datetime
-
-import relexi.rl.models
-import relexi.rl.tf_helpers
-import relexi.env.flexiEnvSmartSim
-import relexi.smartsim.init_smartsim
-import relexi.io.readin as rlxin
-import relexi.io.output as rlxout
-from relexi.smartsim.helpers import generate_rankfile_ompi, copy_to_nodes, parser_flexi_parameters
 
 import tensorflow as tf
 
@@ -26,7 +18,13 @@ from tf_agents.agents.ppo import ppo_clip_agent
 from tf_agents.environments import tf_py_environment
 from tf_agents.replay_buffers import tf_uniform_replay_buffer
 
-
+import relexi.rl.models
+import relexi.rl.tf_helpers
+import relexi.env.flexiEnvSmartSim
+import relexi.smartsim.init_smartsim
+import relexi.io.readin as rlxin
+import relexi.io.output as rlxout
+from relexi.smartsim.helpers import generate_rankfile_ompi, copy_to_nodes, parser_flexi_parameters
 
 
 def train( config_file
