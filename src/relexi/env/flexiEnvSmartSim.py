@@ -24,7 +24,7 @@ try:
   MATPLOTLIB_FOUND = True
 except ImportError:
   MATPLOTLIB_FOUND = False
-  rlxout.printWarning('Could not import Matplotlib. No figures will be created!')
+  rlxout.warning('Could not import Matplotlib. No figures will be created!')
 
 if MATPLOTLIB_FOUND:
   import io
@@ -88,8 +88,8 @@ class flexiEnv(py_environment.PyEnvironment):
     # Sanity Check Launcher
     self.env_launcher = env_launcher
     if ((self.env_launcher == 'local') and (n_procs != 1)):
-      rlxout.printWarning("For env_launcher 'local', only single execution is allowed! Setting 'n_procs=1'!")
-      rlxout.printWarning("To run evironments in parallel with MPI, use env_launcher='mpi'!")
+      rlxout.warning("For env_launcher 'local', only single execution is allowed! Setting 'n_procs=1'!")
+      rlxout.warning("To run evironments in parallel with MPI, use env_launcher='mpi'!")
       n_procs = 1
 
     if (self.env_launcher == 'mpirun'):
@@ -191,8 +191,8 @@ class flexiEnv(py_environment.PyEnvironment):
     ranks_avail  = self.n_procs_per_node*len(self.hosts)
     ranks_needed = n_envs*n_procs
     if (ranks_needed > ranks_avail):
-      rlxout.printWarning(f'Only {ranks_avail} ranks are available, but {ranks_needed} would be required '+
-                           'to start {n_envs} on {n_procs} each.')
+      rlxout.warning(f'Only {ranks_avail} ranks are available, but {ranks_needed} would be required '+
+                      'to start {n_envs} on {n_procs} each.')
 
     # Distribute ranks to instances in a round robin fashion
     # TODO: Get ranks directly from hostfile for PBS Orchestrator
@@ -340,7 +340,7 @@ class flexiEnv(py_environment.PyEnvironment):
       try:
         data = self.client.get_tensor(tag+key)
       except:
-          rlxout.printWarning("Did not get state from environment "+tag[:-1])
+          rlxout.warning("Did not get state from environment "+tag[:-1])
       self.client.delete_tensor(tag+key)
       # Account for Fortran/C memory layout and 32bit for TF
       data = np.transpose(data)

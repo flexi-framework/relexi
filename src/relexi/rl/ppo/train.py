@@ -109,7 +109,7 @@ def train( config_file
   # Check if all necessary files actually exist
   missing_files = rlxin.files_exist([executable_path,parameter_file,train_files,eval_files,reward_spectrum_file])
   for item in missing_files:
-    rlxout.printWarning("The specified file "+item+" does not exist")
+    rlxout.warning("The specified file "+item+" does not exist")
 
   # Activate XLA for performance
   if use_XLA:
@@ -148,7 +148,7 @@ def train( config_file
       pbsJobID = os.environ['PBS_JOBID']
       local_dir = os.path.join(local_dir, pbsJobID)
 
-    rlxout.printNotice("Moving local files to %s ..." % (local_dir))
+    rlxout.info("Moving local files to %s ..." % (local_dir))
 
     # Get list of all nodes
     nodes = copy.deepcopy(worker_nodes)
@@ -167,7 +167,7 @@ def train( config_file
     parameter_file = parser_flexi_parameters(parameter_file, 'MeshFile', mesh_file)
     parameter_file = copy_to_nodes(parameter_file,local_dir,nodes,subfolder='parameter_files')
 
-    rlxout.printNotice(" DONE! ",newline=False)
+    rlxout.info(" DONE! ",newline=False)
 
   if mpi_launch_mpmd:
     rank_files = [rank_files[0] for _ in range(num_parallel_environments)]
@@ -199,7 +199,7 @@ def train( config_file
 
   # Instantiate serial evaluation environment
   if eval_files is None:
-    rlxout.printWarning('No specific Files for Evaluation specified. Using Training files instead')
+    rlxout.warning('No specific Files for Evaluation specified. Using Training files instead')
     eval_files = train_files
 
   my_eval_env = tf_py_environment.TFPyEnvironment(
@@ -328,10 +328,10 @@ def train( config_file
 
 
   # Main train loop
-  rlxout.printBanner('Starting Training Loop!')
+  rlxout.banner('Starting Training Loop!')
   with summary_writer.as_default():
     if do_profile:
-      rlxout.printNotice('Starting profiling....')
+      rlxout.info('Starting profiling....')
       tf.profiler.experimental.start(train_dir)
 
     start_time = time.time()
@@ -358,8 +358,8 @@ def train( config_file
         if my_eval_env.can_plot:
           tf.summary.image("Spectra", my_eval_env.plot(), step=global_step)
 
-        rlxout.printNotice('Eval time: [%5.2f]s' % (time.time()-mytime))
-        rlxout.printNotice('Eval average return: %f' % (eval_avg_return.result().numpy()),newline=False)
+        rlxout.info('Eval time: [%5.2f]s' % (time.time()-mytime))
+        rlxout.info('Eval average return: %f' % (eval_avg_return.result().numpy()),newline=False)
 
       mytime = time.time()
       relexi.rl.tf_helpers.collect_trajectories(collect_driver,my_env)
@@ -375,19 +375,19 @@ def train( config_file
 
       # Log to console every log_interval iterations
       if (i % log_interval) == 0:
-        rlxout.printSmallBanner('ITERATION %i' % i)
+        rlxout.small_banner('ITERATION %i' % i)
 
-        rlxout.printNotice('Episodes:     %i' % (      num_episodes.result().numpy()),newline=False)
-        rlxout.printNotice('Env. Steps:   %i' % (         env_steps.result().numpy()),newline=False)
-        rlxout.printNotice('Train Steps:  %i' % (tf_agent.train_step_counter.numpy()),newline=False)
+        rlxout.info('Episodes:     %i' % (      num_episodes.result().numpy()),newline=False)
+        rlxout.info('Env. Steps:   %i' % (         env_steps.result().numpy()),newline=False)
+        rlxout.info('Train Steps:  %i' % (tf_agent.train_step_counter.numpy()),newline=False)
 
-        rlxout.printNotice('Collect time: [%5.2f]s' % (collect_time))
-        rlxout.printNotice('Train time:   [%5.2f]s' % (train_time)            ,newline=False)
-        rlxout.printNotice('TOTAL:        [%5.2f]s' % (time.time()-start_time),newline=False)
+        rlxout.info('Collect time: [%5.2f]s' % (collect_time))
+        rlxout.info('Train time:   [%5.2f]s' % (train_time)            ,newline=False)
+        rlxout.info('TOTAL:        [%5.2f]s' % (time.time()-start_time),newline=False)
 
       # Checkpoint the policy every ckpt_interval iterations
       if (i % ckpt_interval) == 0:
-        rlxout.printNotice('Saving checkpoint to: ' + ckpt_dir)
+        rlxout.info('Saving checkpoint to: ' + ckpt_dir)
         train_checkpointer.save(global_step)
         #tf_policy_saver.save(ckpt_dir)
 
@@ -395,7 +395,7 @@ def train( config_file
       tf.summary.flush()
 
     if do_profile:
-      rlxout.printNotice('End profiling.')
+      rlxout.info('End profiling.')
       tf.profiler.experimental.stop()
 
     # Close all

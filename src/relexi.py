@@ -74,12 +74,12 @@ def main(argv):
   args = parse_commandline_flags()
 
   # Print Header to Console
-  rlxout.printHeader()
+  rlxout.header()
 
   # Check if we should run on CPU or GPU
   if args.force_cpu: # Force CPU execution
     os.environ["CUDA_VISIBLE_DEVICES"] ="-1"
-    rlxout.printWarning('TensorFlow will be forced to run on CPU')
+    rlxout.warning('TensorFlow will be forced to run on CPU')
     strategy = None
   else: # Check if we find a GPU to run on
     strategy = init_gpus(args.num_gpus)
@@ -102,7 +102,7 @@ def main(argv):
   rlxppo.train(debug=args.debug,config_file=args.config_file,**config,strategy=strategy)
 
   # Finalize Training
-  rlxout.printBanner('Sucessfully finished after: [%8.2f]s' % (time.time()-start_time))
+  rlxout.banner('Sucessfully finished after: [%8.2f]s' % (time.time()-start_time))
 
 
 if __name__ == "__main__":

@@ -69,11 +69,11 @@ def init_smartsim(port = 6790
     4. laun.: pbs,   orch.: local = not supported error: not supported by PBSPro  
   """
 
-  rlxout.printSmallBanner('Starting SmartSim...')
+  rlxout.small_banner('Starting SmartSim...')
 
   # Check whether launcher and orchestrator are identical (case-insensitive)
   if not (launcher_type.casefold() == orchestrator_type.casefold()):
-    rlxout.printWarning('Chosen Launcher '+launcher_type+' and orchestrator '+orchestrator_type +' are incompatible! Please choose identical types for both!')
+    rlxout.warning('Chosen Launcher '+launcher_type+' and orchestrator '+orchestrator_type +' are incompatible! Please choose identical types for both!')
 
   # Is database clustered, i.e. hosted on different nodes?
   db_is_clustered = num_dbs > 1
@@ -86,28 +86,28 @@ def init_smartsim(port = 6790
       walltime = get_pbs_walltime()
       hosts = get_pbs_hosts()
       num_hosts = len(hosts)
-      rlxout.printNotice(f"Identified available nodes: {hosts}")
+      rlxout.info(f"Identified available nodes: {hosts}")
 
       # Maximum of 1 DB per node allowed for PBS Orchestrator
       if num_hosts < num_dbs:
-        rlxout.printWarning(f"You selected {num_dbs} databases and {num_hosts} nodes, but maximum is 1 database per node. "+
+        rlxout.warning(f"You selected {num_dbs} databases and {num_hosts} nodes, but maximum is 1 database per node. "+
                       "Setting number of databases to {num_hosts}")
         num_dbs = num_hosts
 
       # Clustered DB with PBS orchestrator requires at least 3 nodes for reasons
       if db_is_clustered:
         if num_dbs < 3:
-          rlxout.printWarning(f"Only {num_dbs} databases requested, but clustered orchestrator requires 3 or more databases. "+
+          rlxout.warning(f"Only {num_dbs} databases requested, but clustered orchestrator requires 3 or more databases. "+
                         "Non-clustered orchestrator is launched instead!")
           db_is_clustered = False
         else:
-          rlxout.printNotice(f"Using a clustered database with {num_dbs} instances.")
+          rlxout.info(f"Using a clustered database with {num_dbs} instances.")
       else:
-        rlxout.printNotice(f"Using an UNclustered database on root node.")
+        rlxout.info(f"Using an UNclustered database on root node.")
 
     except:
       # If there are no environment variables for a batchjob, then use the local launcher
-      rlxout.printWarning(f"Didn't find pbs batch environment. Switching to local setup.")
+      rlxout.warning(f"Didn't find pbs batch environment. Switching to local setup.")
       PBS_failed = True
 
 
@@ -142,7 +142,7 @@ def init_smartsim(port = 6790
             run_command="mpirun"
             )
   else:
-    rlxout.printWarning("Orchester type "+orchestrator_type+" not implemented")
+    rlxout.warning("Orchester type "+orchestrator_type+" not implemented")
 
 
   # remove db files from previous run if necessary
@@ -150,15 +150,15 @@ def init_smartsim(port = 6790
   #  db.remove_stale_files()
 
   # startup Orchestrator
-  rlxout.printNotice("Starting the Database...",newline=False)
+  rlxout.info("Starting the Database...",newline=False)
   exp.start(db)
 
   # get the database nodes and select the first one
   entry_db = socket.gethostbyname(db.hosts[0])
-  rlxout.printNotice(f"Identified 1 of {len(db.hosts)} database hosts to later connect clients to: {entry_db}",newline=False)
-  rlxout.printNotice(f"If the SmartRedis database isn't stopping properly you can use this command to stop it from the command line:")
+  rlxout.info(f"Identified 1 of {len(db.hosts)} database hosts to later connect clients to: {entry_db}",newline=False)
+  rlxout.info(f"If the SmartRedis database isn't stopping properly you can use this command to stop it from the command line:")
   for db_host in db.hosts:
-    rlxout.printNotice(f"$(smart --dbcli) -h {db_host} -p {port} shutdown",newline=False)
+    rlxout.info(f"$(smart --dbcli) -h {db_host} -p {port} shutdown",newline=False)
 
 
   # If multiple nodes are available, the first executes ReLeXI, while 

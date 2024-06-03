@@ -20,7 +20,7 @@ def init_gpus(num_gpus=1,gpu_memory_growth=False):
   gpus = tf.config.experimental.list_physical_devices('GPU')
   if gpus:
     try:
-      rlxout.printNotice('Found '+str(len(gpus))+' physical GPU(s) on system.')
+      rlxout.info('Found '+str(len(gpus))+' physical GPU(s) on system.')
       # Set Memory growth
       if gpu_memory_growth:
         for gpu in gpus:
@@ -28,25 +28,25 @@ def init_gpus(num_gpus=1,gpu_memory_growth=False):
 
       # Check if enough GPUs available
       if (num_gpus > len(gpus)):
-        rlxout.printWarning('Requested more GPUs than available on the system. Use '+str(len(gpus))+' GPUs instead.')
+        rlxout.warning('Requested more GPUs than available on the system. Use '+str(len(gpus))+' GPUs instead.')
         num_gpus = len(gpus)
 
       # Get Distribution Strategy
       if (num_gpus == 1):
-        rlxout.printNotice('Running on single GPU. To run on multiple GPUs use commandline argument "-n NUM_GPUS"')
+        rlxout.info('Running on single GPU. To run on multiple GPUs use commandline argument "-n NUM_GPUS"')
         return None
       else:
         devices = []
         for i in range(num_gpus):
           devices.append("/gpu:"+str(i))
 
-        rlxout.printNotice('Running Mirrored Distribution Strategy on GPUs: '+",".join(devices))
+        rlxout.info('Running Mirrored Distribution Strategy on GPUs: '+",".join(devices))
         return tf.distribute.MirroredStrategy(devices=devices,cross_device_ops=tf.distribute.NcclAllReduce())
 
     except RuntimeError as e:
-      rlxout.printWarning(e) # Memory growth must be set before GPUs have been initialized
+      rlxout.warning(e) # Memory growth must be set before GPUs have been initialized
   else:
-    rlxout.printWarning('No GPU found on system, Tensorflow will probably run on CPU')
+    rlxout.warning('No GPU found on system, Tensorflow will probably run on CPU')
     return None
 
 @tf.function
