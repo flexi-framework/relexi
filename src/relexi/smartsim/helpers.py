@@ -102,7 +102,7 @@ def clean_ompi_tmpfiles(env_variable="TMPDIR"):
     """
     try:
         tmpdir = os.environ[env_variable]
-    except RuntimeError:
+    except Exception:
         return -1
 
     path = os.path.join(tmpdir, 'ompi.*')
@@ -114,7 +114,7 @@ def clean_ompi_tmpfiles(env_variable="TMPDIR"):
             if os.path.isdir(file_path):
                 try:
                     shutil.rmtree(file_path)
-                except RuntimeError:
+                except Exception:
                     return -1
     return 1
 

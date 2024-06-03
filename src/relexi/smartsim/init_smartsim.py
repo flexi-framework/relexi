@@ -143,7 +143,7 @@ def init_smartsim(
             else:
                 rlxout.info("Using an UNclustered database on root node.")
 
-        except RuntimeError:
+        except Exception:
             # If no env. variables for batchjob, use the local launcher
             rlxout.warning("Didn't find pbs batch environment. Switching to local setup.")
             pbs_failed = True

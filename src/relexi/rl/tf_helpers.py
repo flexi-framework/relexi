@@ -47,7 +47,7 @@ def init_gpus(num_gpus=1, gpu_memory_growth=False):
             rlxout.info('Running Mirrored Distribution Strategy on GPUs: '+",".join(devices))
             return tf.distribute.MirroredStrategy(devices=devices,cross_device_ops=tf.distribute.NcclAllReduce())
 
-        except RuntimeError as e:
+        except Exception as e:
             rlxout.warning(e) # Memory growth must be set before GPUs have been initialized
     else:
         rlxout.warning('No GPU found on system, Tensorflow will probably run on CPU')

@@ -373,7 +373,7 @@ class flexiEnv(py_environment.PyEnvironment):
             self.client.poll_tensor(tag+key, 10, 10000)
             try:
                 data = self.client.get_tensor(tag+key)
-            except RuntimeError:
+            except Exception:
                 rlxout.warning(f"Did not get state from environment {tag[:-1]}")
             self.client.delete_tensor(tag+key)
             # Account for Fortran/C memory layout and 32bit for TF
