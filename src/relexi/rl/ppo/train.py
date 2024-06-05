@@ -1,5 +1,23 @@
 #!/usr/bin/env python3
 
+"""Implements main PPO training routine for Relexi."""
+
+import os
+import time
+import datetime
+import random
+import copy
+import contextlib
+
+import tensorflow as tf
+
+from tf_agents.utils import common
+from tf_agents.metrics import tf_metrics
+from tf_agents.drivers import dynamic_episode_driver
+from tf_agents.agents.ppo import ppo_clip_agent
+from tf_agents.environments import tf_py_environment
+from tf_agents.replay_buffers import tf_uniform_replay_buffer
+
 import relexi.rl.models
 import relexi.rl.tf_helpers
 import relexi.env.flexiEnvSmartSim
@@ -7,34 +25,6 @@ import relexi.smartsim.init_smartsim
 import relexi.io.readin as rlxin
 import relexi.io.output as rlxout
 from relexi.smartsim.helpers import generate_rankfile_ompi, copy_to_nodes, parser_flexi_parameters
-
-import os
-import sys
-import time
-import random
-import copy
-import contextlib
-
-import numpy as np
-import tensorflow as tf
-
-from absl import app
-from absl import flags
-#from absl import logging
-
-from datetime import datetime
-
-from tf_agents.eval import metric_utils
-from tf_agents.utils import common
-from tf_agents.system import multiprocessing
-from tf_agents.metrics import tf_metrics
-from tf_agents.drivers import dynamic_step_driver,dynamic_episode_driver
-from tf_agents.policies import policy_saver
-from tf_agents.agents.ppo import ppo_clip_agent
-from tf_agents.environments import tf_py_environment,parallel_py_environment
-from tf_agents.replay_buffers import tf_uniform_replay_buffer
-
-
 
 
 def train( config_file
@@ -81,322 +71,321 @@ def train( config_file
           ,strategy=None
           ,debug       = 0
         ):
-  """
-  Main training routine. Here, the (FLEXI) environment, the art. neural networks, the optimizer,...
-  are instantiated and initialized. Then the main training loop iteratively collects trajectories
-  and trains the agent on the sampled trajectories.
-  """
+    """
+    Main training routine. Here, the (FLEXI) environment, the art. neural networks, the optimizer,...
+    are instantiated and initialized. Then the main training loop iteratively collects trajectories
+    and trains the agent on the sampled trajectories.
+    """
 
-  # Set output dir to restart dir, if given.
-  # TODO: make this more robust
-  if restart_dir is not None:
-    base_dir = restart_dir
+    # Set output dir to restart dir, if given.
+    # TODO: make this more robust
+    if restart_dir is not None:
+        base_dir = restart_dir
 
-  # Otherwise, use run_name as output dir if given
-  elif run_name is not None:
-    base_dir = "logs/"+run_name
+    # Otherwise, use run_name as output dir if given
+    elif run_name is not None:
+        base_dir = "logs/"+run_name
 
-  # Else, use current time stamp
-  else:
-    base_dir = datetime.now().strftime('%d%m%y_%H%M%S')
-    base_dir = "logs/"+base_dir
+    # Else, use current time stamp
+    else:
+        base_dir = datetime.datetime.now().strftime('%d%m%y_%H%M%S')
+        base_dir = "logs/"+base_dir
 
-  # Set all output directories of the run accordingly
-  train_dir = base_dir+"/train/"
-  eval_dir  = base_dir+"/eval/"
-  ckpt_dir  = base_dir+"/ckpt/"
+    # Set all output directories of the run accordingly
+    train_dir = base_dir+"/train/"
+    eval_dir  = base_dir+"/eval/"
+    ckpt_dir  = base_dir+"/ckpt/"
 
-  # Check if all necessary files actually exist
-  missing_files = rlxin.files_exist([executable_path,parameter_file,train_files,eval_files,reward_spectrum_file])
-  for item in missing_files:
-    rlxout.printWarning("The specified file "+item+" does not exist")
+    # Check if all necessary files actually exist
+    missing_files = rlxin.files_exist([executable_path,parameter_file,train_files,eval_files,reward_spectrum_file])
+    for item in missing_files:
+        rlxout.warning("The specified file "+item+" does not exist")
 
-  # Activate XLA for performance
-  if use_XLA:
-    os.environ['TF_XLA_FLAGS'] = '--tf_xla_cpu_global_jit'
-    tf.config.optimizer.set_jit(True)
+    # Activate XLA for performance
+    if use_XLA:
+        os.environ['TF_XLA_FLAGS'] = '--tf_xla_cpu_global_jit'
+        tf.config.optimizer.set_jit(True)
 
-  # Initialize SmartSim
-  exp, worker_nodes, db, entry_db, is_db_cluster = relexi.smartsim.init_smartsim.init_smartsim(port = smartsim_port
-                                                                                              ,num_dbs = smartsim_num_dbs
-                                                                                              ,launcher_type = smartsim_launcher
-                                                                                              ,orchestrator_type = smartsim_orchestrator
-                                                                                              )
+    # Initialize SmartSim
+    exp, worker_nodes, db, entry_db, is_db_cluster = relexi.smartsim.init_smartsim.init_smartsim(port = smartsim_port
+                                                                                                ,num_dbs = smartsim_num_dbs
+                                                                                                ,launcher_type = smartsim_launcher
+                                                                                                ,orchestrator_type = smartsim_orchestrator
+                                                                                                )
 
-  # generating rankfiles for OpenMPI
-  if mpi_launch_mpmd:
-    # If all MPI jobs are run with single mpirun command, all jobs are allocated based on single rankfile
-    rank_files = generate_rankfile_ompi(worker_nodes
-                                       ,n_procs_per_node
-                                       ,n_par_env=1
-                                       ,ranks_per_env=num_parallel_environments*num_procs_per_environment
-                                       )
+    # generating rankfiles for OpenMPI
+    if mpi_launch_mpmd:
+        # If all MPI jobs are run with single mpirun command, all jobs are allocated based on single rankfile
+        rank_files = generate_rankfile_ompi(worker_nodes
+                                           ,n_procs_per_node
+                                           ,n_par_env=1
+                                           ,ranks_per_env=num_parallel_environments*num_procs_per_environment
+                                           )
 
-  else:
-    # Otherwise every MPI job gets its own rankfile
-    rank_files = generate_rankfile_ompi(worker_nodes
-                                       ,n_procs_per_node
-                                       ,num_parallel_environments
-                                       ,num_procs_per_environment
-                                       )
+    else:
+        # Otherwise every MPI job gets its own rankfile
+        rank_files = generate_rankfile_ompi(worker_nodes
+                                           ,n_procs_per_node
+                                           ,num_parallel_environments
+                                           ,num_procs_per_environment
+                                           )
 
-  # Copy all local files into local directory, possibly fast RAM-Disk or similar
-  # for performance and to reduce Filesystem access
-  if local_dir:
-    # Prefix with PBS Job ID if PBS job
-    if smartsim_launcher.casefold() == 'pbs':
-      pbsJobID = os.environ['PBS_JOBID']
-      local_dir = os.path.join(local_dir, pbsJobID)
+    # Copy all local files into local directory, possibly fast RAM-Disk or similar
+    # for performance and to reduce Filesystem access
+    if local_dir:
+        # Prefix with PBS Job ID if PBS job
+        if smartsim_launcher.casefold() == 'pbs':
+            pbs_job_id = os.environ['PBS_JOBID']
+            local_dir = os.path.join(local_dir, pbs_job_id)
 
-    rlxout.printNotice("Moving local files to %s ..." % (local_dir))
+        rlxout.info(f"Moving local files to {local_dir} ..." )
 
-    # Get list of all nodes
-    nodes = copy.deepcopy(worker_nodes)
-    ai_node = os.environ['HOSTNAME']
-    nodes.insert(0, ai_node)
+        # Get list of all nodes
+        nodes = copy.deepcopy(worker_nodes)
+        ai_node = os.environ['HOSTNAME']
+        nodes.insert(0, ai_node)
 
-    # Move all files to local dir
-    # TODO: control which files are copied by 'local_files' variable!
-    train_files          = copy_to_nodes(train_files,         local_dir,nodes,subfolder='train_files')
-    eval_files           = copy_to_nodes(eval_files,          local_dir,nodes,subfolder='eval_files')
-    reward_spectrum_file = copy_to_nodes(reward_spectrum_file,local_dir,nodes,subfolder='reward_files')
-    rank_files           = copy_to_nodes(rank_files,          local_dir,nodes,subfolder='ompi_rank_files')
-    mesh_file            = copy_to_nodes(mesh_file,           local_dir,nodes,subfolder='ompi_rank_files')
+        # Move all files to local dir
+        # TODO: control which files are copied by 'local_files' variable!
+        train_files          = copy_to_nodes(train_files,         local_dir,nodes,subfolder='train_files')
+        eval_files           = copy_to_nodes(eval_files,          local_dir,nodes,subfolder='eval_files')
+        reward_spectrum_file = copy_to_nodes(reward_spectrum_file,local_dir,nodes,subfolder='reward_files')
+        rank_files           = copy_to_nodes(rank_files,          local_dir,nodes,subfolder='ompi_rank_files')
+        mesh_file            = copy_to_nodes(mesh_file,           local_dir,nodes,subfolder='ompi_rank_files')
 
-    # We have to update the meshfile in the parameter file before copying
-    parameter_file = parser_flexi_parameters(parameter_file, 'MeshFile', mesh_file)
-    parameter_file = copy_to_nodes(parameter_file,local_dir,nodes,subfolder='parameter_files')
+        # We have to update the meshfile in the parameter file before copying
+        parameter_file = parser_flexi_parameters(parameter_file, 'MeshFile', mesh_file)
+        parameter_file = copy_to_nodes(parameter_file,local_dir,nodes,subfolder='parameter_files')
 
-    rlxout.printNotice(" DONE! ",newline=False)
+        rlxout.info(" DONE! ",newline=False)
 
-  if mpi_launch_mpmd:
-    rank_files = [rank_files[0] for _ in range(num_parallel_environments)]
-
-
-  # Instantiate parallel collection environment
-  my_env = tf_py_environment.TFPyEnvironment(
-           relexi.env.flexiEnvSmartSim.flexiEnv(exp
-                                               ,executable_path
-                                               ,parameter_file
-                                               ,tag              = 'train'
-                                               ,port             = smartsim_port
-                                               ,entry_db         = entry_db
-                                               ,is_db_cluster    = is_db_cluster
-                                               ,hosts            = worker_nodes
-                                               ,n_envs           = num_parallel_environments
-                                               ,n_procs          = num_procs_per_environment
-                                               ,n_procs_per_node = n_procs_per_node
-                                               ,spectra_file     = reward_spectrum_file
-                                               ,reward_kmin      = reward_kmin
-                                               ,reward_kmax      = reward_kmax
-                                               ,reward_scale     = reward_scale
-                                               ,restart_files    = train_files
-                                               ,rankfiles        = rank_files
-                                               ,env_launcher     = env_launcher
-                                               ,mpi_launch_mpmd  = mpi_launch_mpmd
-                                               ,debug            = debug
-                                               ))
-
-  # Instantiate serial evaluation environment
-  if eval_files is None:
-    rlxout.printWarning('No specific Files for Evaluation specified. Using Training files instead')
-    eval_files = train_files
-
-  my_eval_env = tf_py_environment.TFPyEnvironment(
-                relexi.env.flexiEnvSmartSim.flexiEnv(exp
-                                                    ,executable_path
-                                                    ,parameter_file
-                                                    ,tag              = 'eval'
-                                                    ,port             = smartsim_port
-                                                    ,entry_db         = entry_db
-                                                    ,is_db_cluster    = is_db_cluster
-                                                    ,hosts            = worker_nodes
-                                                    ,n_procs          = num_procs_per_environment
-                                                    ,n_procs_per_node = n_procs_per_node
-                                                    ,spectra_file     = reward_spectrum_file
-                                                    ,reward_kmin      = reward_kmin
-                                                    ,reward_kmax      = reward_kmax
-                                                    ,reward_scale     = reward_scale
-                                                    ,restart_files    = eval_files
-                                                    ,random_restart_file = False
-                                                    ,rankfiles        = rank_files
-                                                    ,env_launcher     = env_launcher
-                                                    ,debug            = debug
-                                                    ))
+    if mpi_launch_mpmd:
+        rank_files = [rank_files[0] for _ in range(num_parallel_environments)]
 
 
-  # Get training variables
-  optimizer   = tf.keras.optimizers.Adam(learning_rate=train_learning_rate)
-  global_step = tf.compat.v1.train.get_or_create_global_step()
+    # Instantiate parallel collection environment
+    my_env = tf_py_environment.TFPyEnvironment(
+             relexi.env.flexiEnvSmartSim.flexiEnv(exp
+                                                 ,executable_path
+                                                 ,parameter_file
+                                                 ,tag              = 'train'
+                                                 ,port             = smartsim_port
+                                                 ,entry_db         = entry_db
+                                                 ,is_db_cluster    = is_db_cluster
+                                                 ,hosts            = worker_nodes
+                                                 ,n_envs           = num_parallel_environments
+                                                 ,n_procs          = num_procs_per_environment
+                                                 ,n_procs_per_node = n_procs_per_node
+                                                 ,spectra_file     = reward_spectrum_file
+                                                 ,reward_kmin      = reward_kmin
+                                                 ,reward_kmax      = reward_kmax
+                                                 ,reward_scale     = reward_scale
+                                                 ,restart_files    = train_files
+                                                 ,rankfiles        = rank_files
+                                                 ,env_launcher     = env_launcher
+                                                 ,mpi_launch_mpmd  = mpi_launch_mpmd
+                                                 ,debug            = debug
+                                                 ))
 
-  # For distribution strategy, networks and agent have to be initialized within strategy.scope
-  if strategy:
-    context = strategy.scope()
-  else:
-    context = contextlib.nullcontext() # Placeholder that does nothing
+    # Instantiate serial evaluation environment
+    if eval_files is None:
+        rlxout.warning('No specific Files for Evaluation specified. Using Training files instead')
+        eval_files = train_files
 
-  with context:
-    # Set TF random seed within strategy to obtain reproducible results
-    if random_seed:
-      random.seed(random_seed)        # Python seed
-      tf.random.set_seed(random_seed) # TF seed
-
-    # Instantiate actor net
-    actor_net = relexi.rl.models.ActionNetCNN(my_env.observation_spec()
-                                             ,my_env.action_spec()
-                                             ,action_std=action_std
-                                             ,dist_type=dist_type
-                                             ,debug=debug)
-    value_net = relexi.rl.models.ValueNetCNN( my_env.observation_spec()
-                                             ,debug=debug)
-
-    # PPO Agent
-    tf_agent = ppo_clip_agent.PPOClipAgent(
-            my_env.time_step_spec(),
-            my_env.action_spec(),
-            optimizer,
-            actor_net=actor_net,
-            value_net=value_net,
-            importance_ratio_clipping=importance_ratio_clipping,
-            discount_factor=discount_factor,
-            entropy_regularization=entropy_regularization,
-            normalize_observations=False,
-            normalize_rewards=False,
-            use_gae=True,
-            num_epochs=train_num_epochs,
-            train_step_counter=global_step)
-    tf_agent.initialize()
-
-  # Get Agent's Policies
-  eval_policy    = tf_agent.policy
-  collect_policy = tf_agent.collect_policy
-
-  # Instantiate Replay Buffer, which holds the sampled trajectories.
-  replay_buffer = tf_uniform_replay_buffer.TFUniformReplayBuffer(
-                     data_spec  = tf_agent.collect_data_spec,
-                     batch_size = my_env.batch_size,
-                     max_length = train_buffer_capacity)
-
-  # Currently sampling in several times not supported
-  num_episodes_per_iteration=num_parallel_environments
-
-  # Instantiate driver for data collection
-  num_episodes = tf_metrics.NumberOfEpisodes(name='num_episodes')
-  env_steps    = tf_metrics.EnvironmentSteps(name='num_env_steps')
-  avg_return   = tf_metrics.AverageReturnMetric(  name='avg_return'
-                                                 ,buffer_size=num_episodes_per_iteration
-                                                 ,batch_size=num_parallel_environments)
-  min_return   = tf_metrics.MinReturnMetric(      name='min_return'
-                                                 ,buffer_size=num_episodes_per_iteration
-                                                 ,batch_size=num_parallel_environments)
-  max_return   = tf_metrics.MaxReturnMetric(      name='max_return'
-                                                 ,buffer_size=num_episodes_per_iteration
-                                                 ,batch_size=num_parallel_environments)
-  train_metrics  = [num_episodes
-                   ,env_steps
-                   ,avg_return
-                   ,min_return
-                   ,max_return
-                   ]
-
-  collect_driver = dynamic_episode_driver.DynamicEpisodeDriver(my_env
-                                                              ,collect_policy
-                                                              ,observers = train_metrics + [replay_buffer.add_batch]
-                                                              ,num_episodes=num_episodes_per_iteration
-                                                              )
-
-  # Instantiate driver for evaluation
-  eval_avg_eplen  = tf_metrics.AverageEpisodeLengthMetric(name='eval_avg_episode_length',buffer_size=eval_num_episodes)
-  eval_avg_return = tf_metrics.AverageReturnMetric(       name='eval_avg_return'        ,buffer_size=eval_num_episodes)
-  eval_metrics    = [eval_avg_eplen,eval_avg_return]
-  eval_driver     = dynamic_episode_driver.DynamicEpisodeDriver(my_eval_env
-                                                               ,eval_policy
-                                                               ,observers = eval_metrics
-                                                               ,num_episodes=eval_num_episodes
-                                                               )
-  # Write summary to TensorBoard
-  summary_writer = tf.summary.create_file_writer(train_dir, flush_millis=1000)
-
-  # Define checkpointer to save policy
-  train_checkpointer = common.Checkpointer(
-                               ckpt_dir=ckpt_dir,
-                               max_to_keep=ckpt_num,
-                               agent=tf_agent,
-                               policy=tf_agent.policy,
-                               global_step=global_step)
-  train_checkpointer.initialize_or_restore()
+    my_eval_env = tf_py_environment.TFPyEnvironment(
+                  relexi.env.flexiEnvSmartSim.flexiEnv(exp
+                                                      ,executable_path
+                                                      ,parameter_file
+                                                      ,tag              = 'eval'
+                                                      ,port             = smartsim_port
+                                                      ,entry_db         = entry_db
+                                                      ,is_db_cluster    = is_db_cluster
+                                                      ,hosts            = worker_nodes
+                                                      ,n_procs          = num_procs_per_environment
+                                                      ,n_procs_per_node = n_procs_per_node
+                                                      ,spectra_file     = reward_spectrum_file
+                                                      ,reward_kmin      = reward_kmin
+                                                      ,reward_kmax      = reward_kmax
+                                                      ,reward_scale     = reward_scale
+                                                      ,restart_files    = eval_files
+                                                      ,random_restart_file = False
+                                                      ,rankfiles        = rank_files
+                                                      ,env_launcher     = env_launcher
+                                                      ,debug            = debug
+                                                      ))
 
 
-  # Main train loop
-  rlxout.printBanner('Starting Training Loop!')
-  with summary_writer.as_default():
+    # Get training variables
+    optimizer   = tf.keras.optimizers.Adam(learning_rate=train_learning_rate)
+    global_step = tf.compat.v1.train.get_or_create_global_step()
+
+    # For distribution strategy, networks and agent have to be initialized within strategy.scope
+    if strategy:
+        context = strategy.scope()
+    else:
+        context = contextlib.nullcontext()  # Placeholder that does nothing
+
+    with context:
+        # Set TF random seed within strategy to obtain reproducible results
+        if random_seed:
+            random.seed(random_seed)        # Python seed
+            tf.random.set_seed(random_seed)  # TF seed
+
+        # Instantiate actor net
+        actor_net = relexi.rl.models.ActionNetCNN(my_env.observation_spec()
+                                                 ,my_env.action_spec()
+                                                 ,action_std=action_std
+                                                 ,dist_type=dist_type
+                                                 ,debug=debug)
+        value_net = relexi.rl.models.ValueNetCNN( my_env.observation_spec()
+                                                 ,debug=debug)
+
+        # PPO Agent
+        tf_agent = ppo_clip_agent.PPOClipAgent(
+                my_env.time_step_spec(),
+                my_env.action_spec(),
+                optimizer,
+                actor_net=actor_net,
+                value_net=value_net,
+                importance_ratio_clipping=importance_ratio_clipping,
+                discount_factor=discount_factor,
+                entropy_regularization=entropy_regularization,
+                normalize_observations=False,
+                normalize_rewards=False,
+                use_gae=True,
+                num_epochs=train_num_epochs,
+                train_step_counter=global_step)
+        tf_agent.initialize()
+
+    # Get Agent's Policies
+    eval_policy    = tf_agent.policy
+    collect_policy = tf_agent.collect_policy
+
+    # Instantiate Replay Buffer, which holds the sampled trajectories.
+    replay_buffer = tf_uniform_replay_buffer.TFUniformReplayBuffer(
+                       data_spec  = tf_agent.collect_data_spec,
+                       batch_size = my_env.batch_size,
+                       max_length = train_buffer_capacity)
+
+    # Currently sampling in several times not supported
+    num_episodes_per_iteration=num_parallel_environments
+
+    # Instantiate driver for data collection
+    num_episodes = tf_metrics.NumberOfEpisodes(name='num_episodes')
+    env_steps    = tf_metrics.EnvironmentSteps(name='num_env_steps')
+    avg_return   = tf_metrics.AverageReturnMetric(  name='avg_return'
+                                                   ,buffer_size=num_episodes_per_iteration
+                                                   ,batch_size=num_parallel_environments)
+    min_return   = tf_metrics.MinReturnMetric(      name='min_return'
+                                                   ,buffer_size=num_episodes_per_iteration
+                                                   ,batch_size=num_parallel_environments)
+    max_return   = tf_metrics.MaxReturnMetric(      name='max_return'
+                                                   ,buffer_size=num_episodes_per_iteration
+                                                   ,batch_size=num_parallel_environments)
+    train_metrics  = [num_episodes
+                     ,env_steps
+                     ,avg_return
+                     ,min_return
+                     ,max_return
+                     ]
+
+    collect_driver = dynamic_episode_driver.DynamicEpisodeDriver(my_env
+                                                                ,collect_policy
+                                                                ,observers = train_metrics + [replay_buffer.add_batch]
+                                                                ,num_episodes=num_episodes_per_iteration
+                                                                )
+
+    # Instantiate driver for evaluation
+    eval_avg_eplen  = tf_metrics.AverageEpisodeLengthMetric(name='eval_avg_episode_length',buffer_size=eval_num_episodes)
+    eval_avg_return = tf_metrics.AverageReturnMetric(       name='eval_avg_return'        ,buffer_size=eval_num_episodes)
+    eval_metrics    = [eval_avg_eplen,eval_avg_return]
+    eval_driver     = dynamic_episode_driver.DynamicEpisodeDriver(my_eval_env
+                                                                 ,eval_policy
+                                                                 ,observers = eval_metrics
+                                                                 ,num_episodes=eval_num_episodes
+                                                                 )
+    # Write summary to TensorBoard
+    summary_writer = tf.summary.create_file_writer(train_dir, flush_millis=1000)
+
+    # Define checkpointer to save policy
+    train_checkpointer = common.Checkpointer(
+                                 ckpt_dir=ckpt_dir,
+                                 max_to_keep=ckpt_num,
+                                 agent=tf_agent,
+                                 policy=tf_agent.policy,
+                                 global_step=global_step)
+    train_checkpointer.initialize_or_restore()
+
+    # Main train loop
+    rlxout.banner('Starting Training Loop!')
+    with summary_writer.as_default():
+        if do_profile:
+            rlxout.info('Starting profiling....')
+            tf.profiler.experimental.start(train_dir)
+
+        start_time = time.time()
+
+        # In case of restart don't start counting at 0
+        starting_iteration = int(global_step.numpy()/train_num_epochs)
+
+        # Write parameter files to Tensorboard
+        tf.summary.text("training_config"
+                       ,rlxin.read_file(config_file,newline='  \n') # TF uses markdown EOL
+                       ,step=starting_iteration)
+        tf.summary.text("flexi_config"
+                       ,rlxin.read_file(parameter_file,newline='  \n') # TF uses markdown EOL
+                       ,step=starting_iteration)
+
+        for i in range(starting_iteration ,train_num_iterations):
+
+            if (i % eval_interval) == 0:
+                mytime = time.time()
+                relexi.rl.tf_helpers.collect_trajectories(eval_driver,my_eval_env)
+                relexi.rl.tf_helpers.write_metrics(eval_metrics,global_step,'MetricsEval')
+
+                # Plot Energy Spectra to Tensorboard
+                if my_eval_env.can_plot:
+                    tf.summary.image("Spectra", my_eval_env.plot(), step=global_step)
+
+                rlxout.info(f'Eval time: [{time.time()-mytime:5.2f}s]')
+                rlxout.info(f'Eval return: {eval_avg_return.result().numpy():.6f}', newline=False)
+
+            mytime = time.time()
+            relexi.rl.tf_helpers.collect_trajectories(collect_driver,my_env)
+            relexi.rl.tf_helpers.write_metrics(train_metrics,global_step,'MetricsTrain')
+            collect_time = time.time()-mytime
+
+            mytime = time.time()
+            if strategy:
+                relexi.rl.tf_helpers.train_agent_distributed(tf_agent,replay_buffer,strategy)
+            else:
+                relexi.rl.tf_helpers.train_agent(tf_agent,replay_buffer)
+            train_time = time.time()-mytime
+
+            # Log to console every log_interval iterations
+            if (i % log_interval) == 0:
+                rlxout.small_banner(f'ITERATION {i}')
+                rlxout.info(f'Episodes:    {num_episodes.result().numpy()}',      newline=False)
+                rlxout.info(f'Env. Steps:  {env_steps.result().numpy()}',         newline=False)
+                rlxout.info(f'Train Steps: {tf_agent.train_step_counter.numpy()}',newline=False)
+
+                total_time=time.time()-start_time
+                rlxout.info(f'Sample time: [{collect_time:5.2f}s]')
+                rlxout.info(f'Train time:  [{train_time:5.2f}s]',newline=False)
+                rlxout.info(f'TOTAL:       [{total_time:5.2f}s]',newline=False)
+
+            # Checkpoint the policy every ckpt_interval iterations
+            if (i % ckpt_interval) == 0:
+                rlxout.info('Saving checkpoint to: ' + ckpt_dir)
+                train_checkpointer.save(global_step)
+                #tf_policy_saver.save(ckpt_dir)
+
+            # Flush summary to TensorBoard
+            tf.summary.flush()
+
     if do_profile:
-      rlxout.printNotice('Starting profiling....')
-      tf.profiler.experimental.start(train_dir)
-
-    start_time = time.time()
-
-    # In case of restart don't start counting at 0
-    starting_iteration = int(global_step.numpy()/train_num_epochs)
-
-    # Write parameter files to Tensorboard
-    tf.summary.text("training_config"
-                   ,rlxin.read_file(config_file,newline='  \n') # TF uses markdown EOL
-                   ,step=starting_iteration)
-    tf.summary.text("flexi_config"
-                   ,rlxin.read_file(parameter_file,newline='  \n') # TF uses markdown EOL
-                   ,step=starting_iteration)
-
-    for i in range(starting_iteration ,train_num_iterations):
-
-      if (i % eval_interval) == 0:
-        mytime = time.time()
-        relexi.rl.tf_helpers.collect_trajectories(eval_driver,my_eval_env)
-        relexi.rl.tf_helpers.write_metrics(eval_metrics,global_step,'MetricsEval')
-
-        # Plot Energy Spectra to Tensorboard
-        if my_eval_env.can_plot:
-          tf.summary.image("Spectra", my_eval_env.plot(), step=global_step)
-
-        rlxout.printNotice('Eval time: [%5.2f]s' % (time.time()-mytime))
-        rlxout.printNotice('Eval average return: %f' % (eval_avg_return.result().numpy()),newline=False)
-
-      mytime = time.time()
-      relexi.rl.tf_helpers.collect_trajectories(collect_driver,my_env)
-      relexi.rl.tf_helpers.write_metrics(train_metrics,global_step,'MetricsTrain')
-      collect_time = time.time()-mytime
-
-      mytime = time.time()
-      if strategy:
-        relexi.rl.tf_helpers.train_agent_distributed(tf_agent,replay_buffer,strategy)
-      else:
-        relexi.rl.tf_helpers.train_agent(tf_agent,replay_buffer)
-      train_time = time.time()-mytime
-
-      # Log to console every log_interval iterations
-      if (i % log_interval) == 0:
-        rlxout.printSmallBanner('ITERATION %i' % i)
-
-        rlxout.printNotice('Episodes:     %i' % (      num_episodes.result().numpy()),newline=False)
-        rlxout.printNotice('Env. Steps:   %i' % (         env_steps.result().numpy()),newline=False)
-        rlxout.printNotice('Train Steps:  %i' % (tf_agent.train_step_counter.numpy()),newline=False)
-
-        rlxout.printNotice('Collect time: [%5.2f]s' % (collect_time))
-        rlxout.printNotice('Train time:   [%5.2f]s' % (train_time)            ,newline=False)
-        rlxout.printNotice('TOTAL:        [%5.2f]s' % (time.time()-start_time),newline=False)
-
-      # Checkpoint the policy every ckpt_interval iterations
-      if (i % ckpt_interval) == 0:
-        rlxout.printNotice('Saving checkpoint to: ' + ckpt_dir)
-        train_checkpointer.save(global_step)
-        #tf_policy_saver.save(ckpt_dir)
-
-      # Flush summary to TensorBoard
-      tf.summary.flush()
-
-    if do_profile:
-      rlxout.printNotice('End profiling.')
-      tf.profiler.experimental.stop()
+        rlxout.info('End profiling.')
+        tf.profiler.experimental.stop()
 
     # Close all
     del my_env
@@ -404,5 +393,3 @@ def train( config_file
 
     exp.stop(db)
     time.sleep(2.) # Wait for orchestrator to be properly closed
-
-    return
