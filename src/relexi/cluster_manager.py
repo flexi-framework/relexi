@@ -2,11 +2,14 @@
 
 """The Cluster Manager contains all information about the HPC environment."""
 
+import os
+import sys
 import socket
-import rlxout
+
 import smartsim
 
-import sys
+import relexi.io.output as rlxout
+
 
 class ClusterManager():
     """Base class for cluster managers.
@@ -23,7 +26,6 @@ class ClusterManager():
             available or everything runs on single shared node.
         head (str): Hostname of Head node.
         workers (list): List of worker nodes.
-        job_id (str): Job ID of the current job.
 
     Methods:
         print_info: Print information about the current environment.
@@ -35,7 +37,7 @@ class ClusterManager():
         ValueError: If the scheduler type is not supported.
     """
 
-    TYPES = ['local', 'pbs', 'slurm']  # All possible types of cluster managers
+    TYPES = ['local', 'pbs', 'slurm']  # All implemented types of cluster managers
 
     def __init__(
             self,
@@ -47,23 +49,28 @@ class ClusterManager():
         # Check if the scheduler type is supported
         self.type = scheduler_type.casefold().strip()
 
-        rlxout.info('Trying to identify {self.type} training environment...')
+        rlxout.info(f'Trying to identify {self.type} training environment...')
         try:
             self._hosts = self._get_hostlist()
-        except:
+        except Exception as e:
             if self.type == 'local':
                 raise RuntimeError('Failed to setup local training environment!')
-            rlxout.error('Failed!')
-            rlxout.info('Trying to run in local mode instead...')
+            rlxout.warning(f'Failed: {e}')
+            rlxout.info('Trying to run in local mode instead...', newline=False)
             try:
                 self.type = 'local'
                 self._hosts = self._get_hostlist()
             except:
                 raise RuntimeError('Also failed to setup local environment!')
-        rlxout.info('Success!')
+        rlxout.info('Success!', newline=False)
 
-        self.exp, self.db = self._launch_orchestrator(port=db_port,
+        self.db = None
+        self.exp, self.db, self.entry_db = self._launch_orchestrator(port=db_port,
                                                       network_interface=db_network_interface)
+
+    def __del__(self):
+        if self.db:
+            self.exp.stop(self.db)
 
     def _launch_orchestrator(self, port, network_interface):
         """Launches the SmartSim Orchestrator for the current job.
@@ -79,13 +86,13 @@ class ClusterManager():
         rlxout.small_banner('Starting Orchestrator...')
 
         # Generate flexi experiment
-        exp = smartsim.Experiment('flexi', launcher=launcher_type)
+        exp = smartsim.Experiment('flexi', launcher=self.type)
 
         # Initialize the orchestrator based on the orchestrator_type
         if self.type == 'local':
-            db = smartsim.Orchestrator(launcher=self.type, port=port, interface='lo')
+            db = exp.create_database(port=port, interface='lo')
         elif self.type in {'pbs','slurm'}:
-            db = smartsim.Orchestrator(launcher=self.type, port=port, interface=network_interface)
+            db = exp.create_database(hosts=self.head, port=port, interface=network_interface)
         else:
             raise NotImplementedError(f"Orchestrator type {self.type} not implemented.")
 
@@ -95,23 +102,22 @@ class ClusterManager():
             exp.start(db)
         except Exception as e:
             raise RuntimeError(f"Failed to start the Orchestrator: {e}")
-        rlxout.info("  Success!")
+        rlxout.info("Success!", newline=False)
 
         # get the database nodes and select the first one
         entry_db = socket.gethostbyname(db.hosts[0])
         rlxout.info("If the SmartRedis database isn't stopping properly you can use this command to stop it from the command line:")
         rlxout.info(f"$(smart dbcli) -h {db.hosts[0]} -p {port} shutdown", newline=False)
 
-        return exp, db
+        return exp, db, entry_db
 
-    def print_info(self):
+    def info(self):
         """Print information about the current job."""
         rlxout.info("Found the following environment information:")
-        rlxout.info(f"Scheduler Type: {self.type}")
-        rlxout.info(f"Job ID: {self.job_id}")
-        rlxout.info(f"Hosts: {self.hosts}")
-        rlxout.info(f"Head node: {self.head}")
-        rlxout.info(f"Worker nodes: {self.workers}")
+        rlxout.info(f"Scheduler: {self.type}",    newline=False)
+        rlxout.info(f"Hosts:     {self.hosts}",   newline=False)
+        rlxout.info(f"Head node: {self.head}",    newline=False)
+        rlxout.info(f"Workers:   {self.workers}", newline=False)
 
     def _get_hostlist(self):
         """Get the list of hosts the script is executed on.
@@ -196,22 +202,12 @@ class ClusterManager():
             return self._hosts[1:]
         return self._hosts
 
-    @property
-    def job_id(self):
-        """Get the jobID of the current job.
-
-        Returns:
-            Job ID of the current job.
-        """
-        return self._job_id
-
-    def generate_rankfile(self, n_par_env, ranks_per_env, base_path=None):
+    def generate_rankfiles(self, n_models, n_ranks_per_model, base_path=None):
         """Generate rank file for OpenMPI process binding.
 
         Args:
-            cores_per_node (int): Number of cores per node.
-            n_par_env (int): Number of parallel environments to be launched.
-            ranks_per_env (int): Number of ranks per environments.
+            n_models (int): Number of models to be launched.
+            n_ranks_per_model (int): Number of ranks used for each model.
             base_path (str): (Optional.) Path to the directory of the rank files.
 
         Returns:

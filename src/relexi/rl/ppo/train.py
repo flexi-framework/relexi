@@ -21,7 +21,7 @@ from tf_agents.replay_buffers import tf_uniform_replay_buffer
 import relexi.rl.models
 import relexi.rl.tf_helpers
 import relexi.env.flexiEnvSmartSim
-import relexi.smartsim.init_smartsim
+import relexi.cluster_manager
 import relexi.io.readin as rlxin
 import relexi.io.output as rlxout
 from relexi.smartsim.helpers import generate_rankfile_ompi, copy_to_nodes, parser_flexi_parameters
@@ -107,16 +107,16 @@ def train( config_file
         tf.config.optimizer.set_jit(True)
 
     # Initialize SmartSim
-    exp, worker_nodes, db, entry_db, is_db_cluster = relexi.smartsim.init_smartsim.init_smartsim(port = smartsim_port
-                                                                                                ,num_dbs = smartsim_num_dbs
-                                                                                                ,launcher_type = smartsim_launcher
-                                                                                                ,orchestrator_type = smartsim_orchestrator
-                                                                                                )
+    resources = relexi.cluster_manager.ClusterManager(
+                                    scheduler_type=smartsim_orchestrator,
+                                    db_port=smartsim_port,
+                                    )
+    resources.info()
 
     # generating rankfiles for OpenMPI
     if mpi_launch_mpmd:
         # If all MPI jobs are run with single mpirun command, all jobs are allocated based on single rankfile
-        rank_files = generate_rankfile_ompi(worker_nodes
+        rank_files = generate_rankfile_ompi(resources.workers
                                            ,n_procs_per_node
                                            ,n_par_env=1
                                            ,ranks_per_env=num_parallel_environments*num_procs_per_environment
@@ -124,7 +124,7 @@ def train( config_file
 
     else:
         # Otherwise every MPI job gets its own rankfile
-        rank_files = generate_rankfile_ompi(worker_nodes
+        rank_files = generate_rankfile_ompi(resources.workers
                                            ,n_procs_per_node
                                            ,num_parallel_environments
                                            ,num_procs_per_environment
@@ -165,14 +165,13 @@ def train( config_file
 
     # Instantiate parallel collection environment
     my_env = tf_py_environment.TFPyEnvironment(
-             relexi.env.flexiEnvSmartSim.flexiEnv(exp
+             relexi.env.flexiEnvSmartSim.flexiEnv(resources.exp
                                                  ,executable_path
                                                  ,parameter_file
                                                  ,tag              = 'train'
                                                  ,port             = smartsim_port
-                                                 ,entry_db         = entry_db
-                                                 ,is_db_cluster    = is_db_cluster
-                                                 ,hosts            = worker_nodes
+                                                 ,entry_db         = resources.entry_db
+                                                 ,hosts            = resources.workers
                                                  ,n_envs           = num_parallel_environments
                                                  ,n_procs          = num_procs_per_environment
                                                  ,n_procs_per_node = n_procs_per_node
@@ -193,14 +192,13 @@ def train( config_file
         eval_files = train_files
 
     my_eval_env = tf_py_environment.TFPyEnvironment(
-                  relexi.env.flexiEnvSmartSim.flexiEnv(exp
+                  relexi.env.flexiEnvSmartSim.flexiEnv(resources.exp
                                                       ,executable_path
                                                       ,parameter_file
                                                       ,tag              = 'eval'
                                                       ,port             = smartsim_port
-                                                      ,entry_db         = entry_db
-                                                      ,is_db_cluster    = is_db_cluster
-                                                      ,hosts            = worker_nodes
+                                                      ,entry_db         = resources.entry_db
+                                                      ,hosts            = resources.workers
                                                       ,n_procs          = num_procs_per_environment
                                                       ,n_procs_per_node = n_procs_per_node
                                                       ,spectra_file     = reward_spectrum_file
