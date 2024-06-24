@@ -6,7 +6,8 @@ import os
 import socket
 from typing import List, Optional
 
-import smartsim
+from smartsim import Experiment
+from smartsim.database.orchestrator import Orchestrator
 
 import relexi.io.output as rlxout
 
@@ -99,7 +100,7 @@ class ClusterManager:
             self,
             port: int,
             network_interface: str
-            ) -> tuple[smartsim.Experiment, smartsim.Database, str]:
+            ) -> tuple[Experiment, Orchestrator, str]:
         """Launches the SmartSim Orchestrator for the current job.
 
         Args:
@@ -112,7 +113,7 @@ class ClusterManager:
         rlxout.small_banner('Starting Orchestrator...')
 
         # Generate flexi experiment
-        exp = smartsim.Experiment('flexi', launcher=self.type)
+        exp = Experiment('flexi', launcher=self.type)
 
         # Initialize the orchestrator based on the orchestrator_type
         db = exp.create_database(
