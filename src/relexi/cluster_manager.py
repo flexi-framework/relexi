@@ -10,6 +10,7 @@ from smartsim import Experiment
 from smartsim.database.orchestrator import Orchestrator
 
 import relexi.io.output as rlxout
+from relexi.smartsim.helpers import generate_rankfile_ompi
 
 
 class ClusterManager:
@@ -91,8 +92,8 @@ class ClusterManager:
                 try:
                     self.type = 'local'
                     self._hosts = self._get_hostlist()
-                except Exception as e:
-                    raise RuntimeError('Also failed to setup local environment!') from e
+                except Exception as f:
+                    raise RuntimeError('Also failed to setup local environment!') from f
             else:
                 raise RuntimeError('Failed to setup local training environment!') from e
         rlxout.info('Success!', newline=False)
@@ -144,7 +145,7 @@ class ClusterManager:
         rlxout.info("Success!", newline=False)
 
         entry_db = socket.gethostbyname(db.hosts[0])
-        rlxout.info("If the SmartRedis database isn't stopping properly you can use this command to stop it from the command line:")
+        rlxout.info("Use this command to shutdown database if not terminated correctly:")
         rlxout.info(f"$(smart dbcli) -h {db.hosts[0]} -p {port} shutdown", newline=False)
 
         return exp, db, entry_db
@@ -164,12 +165,12 @@ class ClusterManager:
         """
         if self.type == 'local':
             return [socket.gethostname()]
-        elif self.type == 'pbs':
+        if self.type == 'pbs':
             return os.environ['PBS_NODEFILE']
-        elif self.type == 'slurm':
+        if self.type == 'slurm':
             return os.environ['SLURM_NODELIST']
-        else:
-            raise NotImplementedError(f"Method get_hostlist not implemented for scheduler type {self.type}")
+        raise NotImplementedError(
+                f"Method get_hostlist not implemented for scheduler type {self.type}")
 
     @property
     def type(self) -> str:
@@ -203,21 +204,16 @@ class ClusterManager:
 
     @property
     def is_distributed(self) -> bool:
-        """Returns whether ClusterManager runs in distributed or local mode.
+        """Whether `ClusterManager` runs in **Distributed** or **Local** mode.
 
         Returns:
-            bool: Indicates whether cluster runs in distributed or local mode.
-                - True: A dedicated Head node is used for training and the
-                    database and at least one additional Worker node to run
-                    simulations.
-                - False: Only single machine is available and training,
-                    database and simulation will be performed on the localhost.
+            bool: `True` if in **Distributed Mode**, `False` otherwise.
         """
         return len(self._hosts) > 1
 
     @property
     def head(self) -> str:
-        """Get Head node, which is where Relexi is actually runs on.
+        """Return name of Head node, which is where Relexi actually runs on.
 
         Returns:
             str: Hostname of the Head node.
@@ -226,7 +222,7 @@ class ClusterManager:
 
     @property
     def workers(self) -> List[str]:
-        """Get a list of Worker nodes depending on mode.
+        """Returns list of Workers used for running training environments.
 
         Returns:
             list: List containing the hostnames of Worker nodes as strings.
@@ -241,23 +237,8 @@ class ClusterManager:
         rlxout.info(f"  Scheduler: {self.type}", newline=False)
         rlxout.info(f"  Hosts:     {self.hosts}", newline=False)
         if self.is_distributed:
-            rlxout.info(f"Relexi is running in distributed mode:")
+            rlxout.info("Relexi is running in distributed mode:")
             rlxout.info(f"  Head:      {self.head}", newline=False)
             rlxout.info(f"  Workers:   {self.workers}", newline=False)
         else:
             rlxout.info(f"Relexi is running in local mode on: {self.head}")
-
-    def generate_rankfiles(self, n_models: int, n_ranks_per_model: int, base_path: Optional[str] = None) -> List[str]:
-        """Generate rank file for OpenMPI process binding.
-
-        Args:
-            n_models (int): Number of models to be launched.
-            n_ranks_per_model (int): Number of ranks used for each model.
-            base_path (str, optional): Path to the directory of the rank files.
-
-        Returns:
-            list: List of filenames of the rankfiles.
-        """
-        if self.type not in self.TYPES:
-            raise NotImplementedError(f"Method generate_rankfile not implemented for scheduler type {self.type}")
-        return generate_rankfile_ompi(self.hosts, n_models, n_ranks_per_model, base_path)
