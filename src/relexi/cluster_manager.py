@@ -17,36 +17,40 @@ class ClusterManager:
 
     This class defines the interface for cluster managers, which contain all
     information of the HPC environment used for the training environments and
-    method to manage it. This include in particular to identify the scheduler
-    environment, identify the hostnames of the available nodes as well as
-    launching and managing the SmartSim experiment including the Orchestrator.
+    methods to manage it. This includes in particular to identify the scheduler
+    environment, the hostnames of the available nodes and launching and
+    managing the SmartSim `Experiment` including the `Orchestrator`.
 
     Two possible modes are available for using the available compute resources:
 
-        - **Distributed Mode**: The localhost running the main training script
-            becomes the dedicated Head node that hosts the database and runs
-            the model evaluation and training loop. All training environments
-            are distributed to the available Worker nodes.
+        - **Distributed Mode**: The `localhost` running the main training script
+            becomes the dedicated **Head** node that hosts the database,
+            evaluates the model and runs the training loop. All training
+            environments are distributed to the available **Worker** nodes.
 
         - **Local Mode**: The training script, the database and the training
-            environments are all placed on the localhost.
+            environments are all placed on the `localhost`.
 
     For **Distributed Mode**, more than 1 node has to be available. Otherwise
     **Local Mode** will be used. The mode of the `ClusterManager` can be
     retrieved via the `is_distributed` attribute.
 
     Attributes:
-        type (str): Type of the cluster manager. Must be one of
-            **{'local', 'pbs', 'slurm'}**.
-        is_distributed (bool): Whether dedicated head and worker nodes are
-            available or everything runs on single shared node.
-        hosts (list): List of hostnames.
-        head (str): Hostname of Head node.
-        workers (list): List of worker nodes.
-
-    Methods:
-        print_info: Print information about the current environment.
-        generate_rankfiles: Generate rank files for OpenMPI process binding.
+        type (str): Type of the cluster manager. Must be `'local'`, `'pbs'`,
+            or `'slurm'`.
+        is_distributed (bool): Indicates whether cluster runs in
+            **Distributed Mode** or **Local Mode**.
+        hosts (list): List of hostnames of available nodes.
+        head (str): Hostname of Head node (is name of `localhost` if in
+            **Local Mode**).
+        workers (list): List of worker nodes (contains only `localhost` if in
+            **Local Mode**).
+        db (Orchestrator): The launched `Orchestrator` database from the
+            `smartsim` package.
+        exp (Experiment): The `Experiment` object the `Orchestrator` is
+            launched with.
+        entry_db (str): IP address of the host of the database. Required to
+            connect a client to the database.
 
     Raises:
         ValueError: If the scheduler type is not supported.
@@ -62,9 +66,19 @@ class ClusterManager:
     def __init__(
             self,
             scheduler_type: Optional[str] = 'local',
-            db_port: Optional[int] = 6790,
-            db_network_interface: Optional[str] = 'lo'
+            db_network_interface: Optional[str] = 'lo',
+            db_port: Optional[int] = 6790
             ):
+        """Initialize the ClusterManager.
+
+        Args:
+            scheduler_type (str, optional): Type of the cluster manager.
+                Must be `'local'`, `'pbs'`, or `'slurm'`. Defaults to `'local'`.
+            db_network_interface (str, optional): Network interface to use for
+                the Orchestrator. Defaults to `'lo'`.
+            db_port (int, optional): Port to start the Orchestrator on.
+                Defaults to `6790`.
+        """
         self.type = scheduler_type.casefold().strip()
         rlxout.info(f'Trying to identify {self.type} training environment...')
 
@@ -135,18 +149,6 @@ class ClusterManager:
 
         return exp, db, entry_db
 
-    def info(self):
-        """Print information about the current environment."""
-        rlxout.info("Found the following environment:")
-        rlxout.info(f"  Scheduler: {self.type}", newline=False)
-        rlxout.info(f"  Hosts:     {self.hosts}", newline=False)
-        if self.is_distributed:
-            rlxout.info(f"Relexi is running in distributed mode:")
-            rlxout.info(f"  Head node: {self.head}", newline=False)
-            rlxout.info(f"  Workers:   {self.workers}", newline=False)
-        else:
-            rlxout.info(f"Relexi is running in local mode on: {self.head}")
-
     def _get_hostlist(self) -> List[str]:
         """Get the list of hosts the script is executed on.
 
@@ -205,8 +207,8 @@ class ClusterManager:
 
         Returns:
             bool: Indicates whether cluster runs in distributed or local mode.
-                - True: A dedicated head node is used for training and the
-                    database and at least one additional worker node to run
+                - True: A dedicated Head node is used for training and the
+                    database and at least one additional Worker node to run
                     simulations.
                 - False: Only single machine is available and training,
                     database and simulation will be performed on the localhost.
@@ -215,23 +217,35 @@ class ClusterManager:
 
     @property
     def head(self) -> str:
-        """Get head node, which is where Relexi is actually runs on.
+        """Get Head node, which is where Relexi is actually runs on.
 
         Returns:
-            str: Hostname of the head node.
+            str: Hostname of the Head node.
         """
         return self.hosts[0]
 
     @property
     def workers(self) -> List[str]:
-        """Get a list of worker nodes depending on mode.
+        """Get a list of Worker nodes depending on mode.
 
         Returns:
-            list: List containing the hostnames of worker nodes as strings.
+            list: List containing the hostnames of Worker nodes as strings.
         """
         if self.is_distributed:
             return self.hosts[1:]
         return self.hosts
+
+    def info(self):
+        """Print information about the current environment."""
+        rlxout.info("Found the following environment:")
+        rlxout.info(f"  Scheduler: {self.type}", newline=False)
+        rlxout.info(f"  Hosts:     {self.hosts}", newline=False)
+        if self.is_distributed:
+            rlxout.info(f"Relexi is running in distributed mode:")
+            rlxout.info(f"  Head:      {self.head}", newline=False)
+            rlxout.info(f"  Workers:   {self.workers}", newline=False)
+        else:
+            rlxout.info(f"Relexi is running in local mode on: {self.head}")
 
     def generate_rankfiles(self, n_models: int, n_ranks_per_model: int, base_path: Optional[str] = None) -> List[str]:
         """Generate rank file for OpenMPI process binding.
