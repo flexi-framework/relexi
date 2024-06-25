@@ -44,7 +44,7 @@ def generate_rankfile_ompi(hosts, cores_per_node, n_par_env, ranks_per_env, base
     for env_idx in range(n_par_env):
         filename = os.path.join(rankfile_dir, f"par_env_{env_idx:05d}")
         rankfiles.append(filename)
-        with open(filename, 'w', encoding='ascii') as rankfile:
+        with open(filename, 'w', encoding='utf-8') as rankfile:
             for i in range(ranks_per_env):
                 rankfile.write(f"rank {i}={hosts[n_cores_used//cores_per_node]} slot={next_free_slot}\n")
                 next_free_slot = next_free_slot + 1
@@ -76,8 +76,8 @@ def parser_flexi_parameters(parameter_file, keyword, value):
     pbs_job_id = os.environ['PBS_JOBID']
     parameter_file_out = f"parameter_flexi-{pbs_job_id[0:7]}.ini"
 
-    with open(parameter_file_out, 'w', encoding='ascii') as new_file:
-        with open(parameter_file_in, 'r', encoding='ascii') as old_file:
+    with open(parameter_file_out, 'w', encoding='utf-8') as new_file:
+        with open(parameter_file_in, 'r', encoding='utf-8') as old_file:
             for line in old_file:
                 new_file.write(pattern.sub(subst, line))
     return parameter_file_out

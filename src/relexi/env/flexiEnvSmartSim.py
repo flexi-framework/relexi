@@ -95,7 +95,7 @@ class flexiEnv(py_environment.PyEnvironment):
 
         # Read target DNS spectra from file
         if spectra_file:
-            with open(spectra_file, 'r', encoding='ascii') as csvfile:
+            with open(spectra_file, 'r', encoding='utf-8') as csvfile:
                 reader = csv.reader(csvfile, delimiter=',')
                 col_e = next(reader).index('E')
                 e = []
