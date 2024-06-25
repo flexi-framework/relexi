@@ -48,16 +48,16 @@ class ClusterManager:
             **Local Mode**).
         db (Orchestrator): The launched `Orchestrator` database from the
             `smartsim` package.
+        db_entry (str): IP address of the host of the database. Required to
+            connect a client to the database.
         exp (Experiment): The `Experiment` object the `Orchestrator` is
             launched with.
-        entry_db (str): IP address of the host of the database. Required to
-            connect a client to the database.
 
     Raises:
         ValueError: If the scheduler type is not supported.
         RuntimeError: If the following conditions are met:
             - The scheduler environment cannot be identified, or
-            - Launching the Orchestrator fails.
+            - Launching the `Orchestrator` fails.
         NotImplementedError: If the methods are not implemented for the
             provided scheduler type.
     """
@@ -99,7 +99,7 @@ class ClusterManager:
         rlxout.info('Success!', newline=False)
 
         self.db = None
-        self.exp, self.db, self.entry_db = self._launch_orchestrator(
+        self._exp, self._db, self._db_entry = self._launch_orchestrator(
             port=db_port,
             network_interface=db_network_interface,
         )
@@ -110,6 +110,161 @@ class ClusterManager:
                 self.exp.stop(self.db)
             except Exception as e:
                 raise RuntimeError('Failed to stop the Orchestrator!') from e
+
+    def info(self):
+        """Prints information about the current environment."""
+        rlxout.info("Found the following environment:")
+        rlxout.info(f"  Scheduler: {self.type}", newline=False)
+        rlxout.info(f"  Hosts:     {self.hosts}", newline=False)
+        if self.is_distributed:
+            rlxout.info("Relexi is running in distributed mode:")
+            rlxout.info(f"  Head:      {self.head}", newline=False)
+            rlxout.info(f"  Workers:   {self.workers}", newline=False)
+        else:
+            rlxout.info(f"Relexi is running in local mode on: {self.head}")
+
+    def get_worker_slots(self) -> List[str]:
+        """Gets the list of available MPI slots on the Worker nodes.
+
+        To obtain a list of all available MPI slots on the Worker nodes, the
+        following strategy is used depending on the type of environment:
+            - `local`: All CPU cores from localhost are used except one to run
+                training script and the database.
+            - `pbs`: The number of slots is determined by accessing the
+                `PBS_NODEFILE` environment variable and removing the Head node.
+            - `slurm`: The number of slots is determined by accessing the
+                `SLURM_JOB_CPUS_PER_NODE` environment variable and counting the
+                number of Worker nodes.
+
+        Returns:
+            list: List containing hostname and host-local slot number of each
+                free slot on the Worker nodes.
+        """
+        if self.type == 'local':
+            n_cpus = os.cpu_count()-1  # Save 1 CPU core for the Head tasks
+            return [[self.head, str(i)] for i in range(n_cpus)]
+
+        if self.type == 'pbs':
+            # Get PBS_NODEFILE count number of slots per node and return list
+            # of slots per node.
+            nodes = self._read_pbs_nodefile()
+            worker_slots = []
+            for worker in self.workers:
+                n_slots = sum(1 for nodename in nodes if worker in nodename)
+                #worker_slots.append({worker: str(i)})  # Dict of slots per node
+                for i in range(n_slots):
+                    worker_slots.append([worker, str(i)])
+            return worker_slots
+
+        if self.type == 'slurm':
+            cpus_per_node = os.environ['SLURM_JOB_CPUS_PER_NODE']
+            if cpus_per_node is None:
+                raise KeyError("Environment variable 'SLURM_JOB_CPUS_PER_NODE' is not set!")
+            for worker in self.workers:
+                for i in range(cpus_per_node):
+                    worker_slots.append([worker, str(i)])
+            return worker_slots
+
+        raise NotImplementedError(
+            f"Method 'get_worker_slots' not implemented for scheduler type {self.type}")
+
+    @property
+    def type(self) -> str:
+        """Get the type of scheduler environment used for the cluster manager.
+
+        Returns:
+            str: Type of the cluster manager.
+        """
+        return self._type
+
+    @type.setter
+    def type(self, value: str):
+        """Set the type of scheduler environment used for the cluster manager.
+        Ensure that the type is supported.
+
+        Args:
+            value (str): Type of the cluster manager.
+        """
+        if value not in self.TYPES:
+            raise ValueError(f"Scheduler type {value} not supported.")
+        self._type = value
+
+    @property
+    def hosts(self) -> List[str]:
+        """Get the list of hosts the script is executed on.
+
+        Returns:
+            list: List containing the hostnames as strings.
+        """
+        return self._hosts
+
+    @property
+    def is_distributed(self) -> bool:
+        """Whether `ClusterManager` runs in **Distributed** or **Local** mode.
+
+        Checks for the number of hosts available. If more than one host is
+        used, the `ClusterManager` runs in **Distributed Mode**.
+
+        Returns:
+            bool: `True` if in **Distributed Mode**, `False` otherwise.
+        """
+        return len(self._hosts) > 1
+
+    @property
+    def head(self) -> str:
+        """Return name of Head node, which is where Relexi actually runs on.
+
+        Returns:
+            str: Hostname of the Head node.
+        """
+        return self._get_local_hostname()
+
+    @property
+    def workers(self) -> List[str]:
+        """Returns list of Workers used for running training environments.
+
+        Obtains Workers by removing the Head node from the list of hosts.
+
+        Returns:
+            list: List containing the hostnames of Workers as strings.
+        """
+        if self.is_distributed:
+            local_host = self._get_local_hostname()
+            workers = self.hosts.copy()
+            if local_host in workers:
+                workers.remove(local_host)
+            else:
+                rlxout.warning(f"Localhost '{local_host}' not found in hosts list:")
+                rlxout.warning(f"  {workers}")
+            return workers
+        return self.hosts
+
+    @property
+    def db(self) -> Orchestrator:
+        """Get the Orchestrator database object.
+
+        Returns:
+            Orchestrator: The Orchestrator database object.
+        """
+        return self._db
+
+    @property
+    def db_entry(self) -> str:
+        """Get the IP address of the host of the database.
+
+        Returns:
+            str: IP address of the host of the database.
+        """
+        return self._db_entry
+
+    @property
+    def exp(self) -> Experiment:
+        """Get the Experiment object the Orchestrator is launched with.
+
+        Returns:
+            Experiment: The Experiment object.
+        """
+        return self._exp
 
     def _launch_orchestrator(
             self,
@@ -164,81 +319,60 @@ class ClusterManager:
                 scheduler type.
         """
         if self.type == 'local':
-            return [socket.gethostname()]
+            return [self._get_local_hostname()]
         if self.type == 'pbs':
-            return os.environ['PBS_NODEFILE']
+            nodes = self._read_pbs_nodefile()
+            # Get the list of unique nodes via casting into set and list again
+            return list(set(nodes))
         if self.type == 'slurm':
-            return os.environ['SLURM_NODELIST']
+            return self._get_slurm_nodelist()
         raise NotImplementedError(
-                f"Method get_hostlist not implemented for scheduler type {self.type}")
+            f"Method `get_hostlist` not implemented for scheduler type {self.type}!")
 
-    @property
-    def type(self) -> str:
-        """Get the type of scheduler environment used for the cluster manager.
+    def _read_pbs_nodefile() -> List[str]:
+        """Read the PBS_NODEFILE and return the list of nodes.
 
-        Returns:
-            str: Type of the cluster manager.
-        """
-        return self._type
-
-    @type.setter
-    def type(self, value: str):
-        """Set the type of scheduler environment used for the cluster manager.
-        Ensure that the type is supported.
-
-        Args:
-            value (str): Type of the cluster manager.
-        """
-        if value not in self.TYPES:
-            raise ValueError(f"Scheduler type {value} not supported.")
-        self._type = value
-
-    @property
-    def hosts(self) -> List[str]:
-        """Get the list of hosts the script is executed on.
+        NOTE:
+            The PBS_NODEFILE contains the list of nodes allocated to the job.
+            If a node provides multiple MPI slots, it is the corresponding
+            number of times in the file.
 
         Returns:
             list: List containing the hostnames as strings.
         """
-        return self._hosts
+        if self.type != 'pbs':
+            raise ValueError("Method 'read_pbs_nodefile' only available for PBS scheduler!")
+        node_file = os.environ['PBS_NODEFILE']
+        if node_file is None:
+            raise KeyError("Environment variable 'PBS_NODEFILE' is not set!")
+        with open(node_file, 'r', encoding='utf-8') as f:
+            nodes = [line.strip() for line in f.readlines()]
+        return nodes
 
-    @property
-    def is_distributed(self) -> bool:
-        """Whether `ClusterManager` runs in **Distributed** or **Local** mode.
-
-        Returns:
-            bool: `True` if in **Distributed Mode**, `False` otherwise.
-        """
-        return len(self._hosts) > 1
-
-    @property
-    def head(self) -> str:
-        """Return name of Head node, which is where Relexi actually runs on.
+    def _get_slurm_nodelist() -> List[str]:
+        """Get the list of hosts from the SLURM_NODELIST environment variable.
 
         Returns:
-            str: Hostname of the Head node.
+            list: List containing the unique hostnames as strings.
         """
-        return self.hosts[0]
+        if self.type != 'slurm':
+            raise ValueError("Method 'get_slurm_nodelist' only available for SLURM scheduler!")
+        # Get the compressed list of nodes from SLURM_NODELIST
+        node_list = os.getenv('SLURM_NODELIST')
+        if node_list is None:
+            raise KeyError("Environment variable 'SLURM_NODELIST' is not set!")
+        # Use scontrol to expand the node list
+        result = subprocess.run(['scontrol', 'show', 'hostname', node_list], capture_output=True, text=True)
+        # Check if the command was successful
+        if result.returncode != 0:
+            raise RuntimeError(f"scontrol command failed: {result.stderr.strip()}")
+        # Split the output into individual hostnames
+        return result.stdout.strip().split('\n')
 
-    @property
-    def workers(self) -> List[str]:
-        """Returns list of Workers used for running training environments.
+    def _get_local_hostname(self) -> str:
+        """Get the hostname of the machine executing the Python script.
 
         Returns:
-            list: List containing the hostnames of Worker nodes as strings.
+            str: Hostname of the local machine executing the script.
         """
-        if self.is_distributed:
-            return self.hosts[1:]
-        return self.hosts
-
-    def info(self):
-        """Print information about the current environment."""
-        rlxout.info("Found the following environment:")
-        rlxout.info(f"  Scheduler: {self.type}", newline=False)
-        rlxout.info(f"  Hosts:     {self.hosts}", newline=False)
-        if self.is_distributed:
-            rlxout.info("Relexi is running in distributed mode:")
-            rlxout.info(f"  Head:      {self.head}", newline=False)
-            rlxout.info(f"  Workers:   {self.workers}", newline=False)
-        else:
-            rlxout.info(f"Relexi is running in local mode on: {self.head}")
+        return socket.gethostname()
