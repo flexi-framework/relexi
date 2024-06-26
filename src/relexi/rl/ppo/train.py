@@ -21,10 +21,10 @@ from tf_agents.replay_buffers import tf_uniform_replay_buffer
 import relexi.rl.models
 import relexi.rl.tf_helpers
 import relexi.env.flexiEnvSmartSim
-import relexi.cluster_manager
+import relexi.runtime
 import relexi.io.readin as rlxin
 import relexi.io.output as rlxout
-from relexi.smartsim.helpers import generate_rankfile_ompi, copy_to_nodes, parser_flexi_parameters
+from relexi.runtime.helpers import generate_rankfile_ompi, copy_to_nodes, parser_flexi_parameters
 
 
 def train( config_file
@@ -107,17 +107,17 @@ def train( config_file
         tf.config.optimizer.set_jit(True)
 
     # Initialize SmartSim
-    resources = relexi.cluster_manager.ClusterManager(
-                                    scheduler_type=smartsim_orchestrator,
+    runtime = relexi.runtime.Runtime(
+                                    type_=smartsim_orchestrator,
                                     db_port=smartsim_port,
                                     db_network_interface='ibp94s0',
                                     )
-    resources.info()
+    runtime.info()
 
     # generating rankfiles for OpenMPI
     if mpi_launch_mpmd:
         # If all MPI jobs are run with single mpirun command, all jobs are allocated based on single rankfile
-        rank_files = generate_rankfile_ompi(resources.workers
+        rank_files = generate_rankfile_ompi(runtime.workers
                                            ,n_procs_per_node
                                            ,n_par_env=1
                                            ,ranks_per_env=num_parallel_environments*num_procs_per_environment
@@ -125,7 +125,7 @@ def train( config_file
 
     else:
         # Otherwise every MPI job gets its own rankfile
-        rank_files = generate_rankfile_ompi(resources.workers
+        rank_files = generate_rankfile_ompi(runtime.workers
                                            ,n_procs_per_node
                                            ,num_parallel_environments
                                            ,num_procs_per_environment
@@ -166,13 +166,13 @@ def train( config_file
 
     # Instantiate parallel collection environment
     my_env = tf_py_environment.TFPyEnvironment(
-             relexi.env.flexiEnvSmartSim.flexiEnv(resources.exp
+             relexi.env.flexiEnvSmartSim.flexiEnv(runtime.exp
                                                  ,executable_path
                                                  ,parameter_file
                                                  ,tag              = 'train'
                                                  ,port             = smartsim_port
-                                                 ,entry_db         = resources.db_entry
-                                                 ,hosts            = resources.workers
+                                                 ,entry_db         = runtime.db_entry
+                                                 ,hosts            = runtime.workers
                                                  ,n_envs           = num_parallel_environments
                                                  ,n_procs          = num_procs_per_environment
                                                  ,n_procs_per_node = n_procs_per_node
@@ -193,13 +193,13 @@ def train( config_file
         eval_files = train_files
 
     my_eval_env = tf_py_environment.TFPyEnvironment(
-                  relexi.env.flexiEnvSmartSim.flexiEnv(resources.exp
+                  relexi.env.flexiEnvSmartSim.flexiEnv(runtime.exp
                                                       ,executable_path
                                                       ,parameter_file
                                                       ,tag              = 'eval'
                                                       ,port             = smartsim_port
-                                                      ,entry_db         = resources.db_entry
-                                                      ,hosts            = resources.workers
+                                                      ,entry_db         = runtime.db_entry
+                                                      ,hosts            = runtime.workers
                                                       ,n_procs          = num_procs_per_environment
                                                       ,n_procs_per_node = n_procs_per_node
                                                       ,spectra_file     = reward_spectrum_file
@@ -390,5 +390,5 @@ def train( config_file
     del my_env
     del my_eval_env
 
-    del resources
+    del runtime
     time.sleep(2.) # Wait for orchestrator to be properly closed

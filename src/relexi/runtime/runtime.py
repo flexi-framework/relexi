@@ -1,24 +1,24 @@
 #!/usr/bin/env python3
 
-"""The ClusterManager class for managing the HPC environment."""
+"""The Runtime class for managing the HPC runtime environment."""
 
 import os
 import socket
 import subprocess
-from typing import List, Optional
+from typing import List, Optional, Union
 
 import smartsim
 from smartsim import Experiment
 from smartsim.database.orchestrator import Orchestrator
 
 import relexi.io.output as rlxout
-from relexi.smartsim.helpers import generate_rankfile_ompi
+from relexi.runtime.helpers import generate_rankfile_ompi
 
 
-class ClusterManager:
+class Runtime:
     """Class containing information about and handling the HPC environment.
 
-    This class defines the interface for cluster managers, which contain all
+    This class defines the interface for an HPC runtime, which contains all
     information of the HPC environment used for the training environments and
     methods to manage it. This includes in particular to identify the scheduler
     environment, the hostnames of the available nodes and launching and
@@ -26,23 +26,23 @@ class ClusterManager:
 
     Two possible modes are available for using the available compute resources:
 
-        - **Distributed Mode**: The `localhost` running the main training script
+        - **Distributed**: The `localhost` running the main training script
             becomes the dedicated **Head** node that hosts the database,
             evaluates the model and runs the training loop. All training
             environments are distributed to the available **Worker** nodes.
 
-        - **Local Mode**: The training script, the database and the training
+        - **Local**: The training script, the database and the training
             environments are all placed on the `localhost`.
 
-    For **Distributed Mode**, more than 1 node has to be available. Otherwise
-    **Local Mode** will be used. The mode of the `ClusterManager` can be
-    retrieved via the `is_distributed` attribute.
+    More than 1 node has to be available in order to initiate a
+    **Distributed** runtime. Otherwise, if only a single node is available,
+    **Local** mode will be used. The mode of the `Runtime` can be retrieved
+    via the `is_distributed` attribute.
 
     Attributes:
-        type (str): Type of the cluster manager. Must be `'local'`, `'pbs'`,
-            or `'slurm'`.
-        is_distributed (bool): Indicates whether cluster runs in
-            **Distributed Mode** or **Local Mode**.
+        type (str): Type of runtime. Must be `'local'`, `'pbs'`, or `'slurm'`.
+        is_distributed (bool): Indicates whether a **Distributed** or **Local**
+            runtime is used.
         hosts (list): List of hostnames of available nodes.
         head (str): Hostname of Head node (is name of `localhost` if in
             **Local Mode**).
@@ -64,49 +64,49 @@ class ClusterManager:
             provided scheduler type.
     """
 
-    TYPES = ['local', 'pbs', 'slurm']  # All implemented types of cluster managers
+    TYPES = ['local', 'pbs', 'slurm']
+    """Supported types of runtime environments."""
 
     def __init__(
             self,
-            scheduler_type: Optional[str] = 'auto',
+            type_: Optional[str] = 'auto',
             db_network_interface: Optional[str] = 'lo',
             db_port: Optional[int] = 6790
             ):
-        """Initialize the ClusterManager.
+        """Initialize the Runtime.
 
         Args:
-            scheduler_type (str, optional): Type of the cluster manager.
-                Must be `'local'`, `'pbs'`, `'slurm'` or `'auto'`. Defaults to
-                `'auto'`, for which the type of cluster environment iss
-                identified automatically.
+            type_ (str, optional): Type of runtime. Must be `'local'`, `'pbs'`,
+                `'slurm'` or `'auto'`. Defaults to `'auto'`, for which the type
+                of runtime environment is identified automatically.
             db_network_interface (str, optional): Network interface to use for
                 the Orchestrator. Defaults to `'lo'`.
             db_port (int, optional): Port to start the Orchestrator on.
                 Defaults to `6790`.
         """
         # Using SmartSim utility to identify type automatically
-        if scheduler_type == 'auto':
-            rlxout.info('Trying to identify cluster environment...')
-            scheduler = smartsim.wlm.detect_launcher()
-            rlxout.info(f'Found "{scheduler}" environment!', newline=False)
-            self.type = scheduler.casefold().strip()
-        else:
-            self.type = scheduler_type.casefold().strip()
-
-        rlxout.info(f'Trying to setup "{self.type}" environment...')
         try:
+            if type_ == 'auto':
+                rlxout.info('Identifying environment...')
+                scheduler = smartsim.wlm.detect_launcher()
+                rlxout.info(f'Found "{scheduler}" environment!', newline=False)
+                self.type = scheduler.casefold().strip()
+            else:
+                self.type = type_.casefold().strip()
+
+            rlxout.info(f'Setting up "{self.type}" runtime...')
             self._hosts = self._get_hostlist()
         except Exception as e:
             rlxout.warning(f'Failed: {e}')
             if self.type != 'local':
-                rlxout.info('Trying to run in local mode instead...', newline=False)
+                rlxout.info('Trying to setup LOCAL runtime instead...', newline=False)
                 try:
                     self.type = 'local'
                     self._hosts = self._get_hostlist()
                 except Exception as f:
-                    raise RuntimeError('Also failed to setup local environment!') from f
+                    raise RuntimeError('Also failed to setup LOCAL environment!') from f
             else:
-                raise RuntimeError('Failed to setup local training environment!') from e
+                raise RuntimeError('Failed to setup LOCAL training environment!') from e
         rlxout.info('Success!', newline=False)
 
         self._db = None
@@ -123,86 +123,42 @@ class ClusterManager:
                 raise RuntimeError('Failed to stop the Orchestrator!') from e
 
     def info(self):
-        """Prints information about the current environment."""
-        rlxout.info("Found the following environment:")
-        rlxout.info(f"  Scheduler: {self.type}", newline=False)
-        rlxout.info(f"  Hosts:     {self.hosts}", newline=False)
+        """Prints information about the current runtime environment."""
+        rlxout.info('Configuration of runtime environment:')
+        rlxout.info(f'  Scheduler: {self.type}', newline=False)
+        rlxout.info(f'  Hosts:     {self.hosts}', newline=False)
         if self.is_distributed:
-            rlxout.info("Relexi is running in distributed mode:")
-            rlxout.info(f"  Head:      {self.head}", newline=False)
-            rlxout.info(f"  Workers:   {self.workers}", newline=False)
+            rlxout.info('Running in DISTRIBUTED mode:')
+            rlxout.info(f'  Head:      {self.head}', newline=False)
+            rlxout.info(f'  Workers:   {self.workers}', newline=False)
         else:
-            rlxout.info(f"Relexi is running in local mode on: {self.head}")
-
-    def get_worker_slots(self) -> List[str]:
-        """Gets the list of available MPI slots on the Worker nodes.
-
-        To obtain a list of all available MPI slots on the Worker nodes, the
-        following strategy is used depending on the type of environment:
-            - `local`: All CPU cores from localhost are used except one to run
-                training script and the database.
-            - `pbs`: The number of slots is determined by accessing the
-                `PBS_NODEFILE` environment variable and removing the Head node.
-            - `slurm`: The number of slots is determined by accessing the
-                `SLURM_JOB_CPUS_PER_NODE` environment variable and counting the
-                number of Worker nodes.
-
-        Returns:
-            list: List containing hostname and host-local slot number of each
-                free slot on the Worker nodes.
-        """
-        if self.type == 'local':
-            n_cpus = os.cpu_count()-1  # Save 1 CPU core for the Head tasks
-            return [[self.head, str(i)] for i in range(n_cpus)]
-
-        if self.type == 'pbs':
-            # Get PBS_NODEFILE count number of slots per node and return list
-            # of slots per node.
-            nodes = self._read_pbs_nodefile()
-            worker_slots = []
-            for worker in self.workers:
-                n_slots = sum(1 for nodename in nodes if worker in nodename)
-                #worker_slots.append({worker: str(i)})  # Dict of slots per node
-                for i in range(n_slots):
-                    worker_slots.append([worker, str(i)])
-            return worker_slots
-
-        if self.type == 'slurm':
-            cpus_per_node = os.environ['SLURM_JOB_CPUS_PER_NODE']
-            if cpus_per_node is None:
-                raise KeyError("Environment variable 'SLURM_JOB_CPUS_PER_NODE' is not set!")
-            for worker in self.workers:
-                for i in range(cpus_per_node):
-                    worker_slots.append([worker, str(i)])
-            return worker_slots
-
-        raise NotImplementedError(
-            f"Method 'get_worker_slots' not implemented for scheduler type {self.type}")
+            rlxout.info(f'Running in LOCAL mode on: {self.head}')
 
     @property
     def type(self) -> str:
-        """Get the type of scheduler environment used for the cluster manager.
+        """Get the type of the runtime environment.
 
         Returns:
-            str: Type of the cluster manager.
+            str: Type of the runtime environment.
         """
         return self._type
 
     @type.setter
     def type(self, value: str):
-        """Set the type of scheduler environment used for the cluster manager.
-        Ensure that the type is supported.
+        """Set the type of environment used for the runtime.
+
+        Validates that the type is actually supported.
 
         Args:
-            value (str): Type of the cluster manager.
+            value (str): Type of the runtime environment.
         """
         if value not in self.TYPES:
-            raise ValueError(f"Scheduler type {value} not supported.")
+            raise ValueError(f'Runtime of type {value} not supported.')
         self._type = value
 
     @property
     def hosts(self) -> List[str]:
-        """Get the list of hosts the script is executed on.
+        """Get the list of hosts within the runtime environment.
 
         Returns:
             list: List containing the hostnames as strings.
@@ -211,19 +167,20 @@ class ClusterManager:
 
     @property
     def is_distributed(self) -> bool:
-        """Whether `ClusterManager` runs in **Distributed** or **Local** mode.
+        """Whether runtime is **Distributed** or **Local**.
 
         Checks for the number of hosts available. If more than one host is
-        used, the `ClusterManager` runs in **Distributed Mode**.
+        found in runtime, it runs in **Distributed** mode, otherwise it runs
+        in **Local** mode.
 
         Returns:
-            bool: `True` if in **Distributed Mode**, `False` otherwise.
+            bool: `True` if **Distributed**, `False` otherwise.
         """
         return len(self._hosts) > 1
 
     @property
     def head(self) -> str:
-        """Return name of Head node, which is where Relexi actually runs on.
+        """Return name of Head node, which is where this instance is located.
 
         Returns:
             str: Hostname of the Head node.
@@ -232,7 +189,7 @@ class ClusterManager:
 
     @property
     def workers(self) -> List[str]:
-        """Returns list of Workers used for running training environments.
+        """Returns list of Workers found in the current runtime environment.
 
         Obtains Workers by removing the Head node from the list of hosts.
 
@@ -245,17 +202,17 @@ class ClusterManager:
             if local_host in workers:
                 workers.remove(local_host)
             else:
-                rlxout.warning(f"Localhost '{local_host}' not found in hosts list:")
-                rlxout.warning(f"  {workers}")
+                rlxout.warning(f'Localhost "{local_host}" not found in hosts list:')
+                rlxout.warning(f'  {workers}')
             return workers
         return self.hosts
 
     @property
     def db(self) -> Orchestrator:
-        """Get the Orchestrator database object.
+        """Get the Orchestrator database instance.
 
         Returns:
-            Orchestrator: The Orchestrator database object.
+            Orchestrator: The `Orchestrator` database instance.
         """
         return self._db
 
@@ -270,10 +227,10 @@ class ClusterManager:
 
     @property
     def exp(self) -> Experiment:
-        """Get the Experiment object the Orchestrator is launched with.
+        """Get the `Experiment` instance the `Orchestrator` is launched in.
 
         Returns:
-            Experiment: The Experiment object.
+            Experiment: The `Experiment` instance.
         """
         return self._exp
 
@@ -282,19 +239,21 @@ class ClusterManager:
             port: int,
             network_interface: str
             ) -> tuple[Experiment, Orchestrator, str]:
-        """Launches the SmartSim Orchestrator for the current job.
+        """Launches a SmartSim `Orchestratori` in the current runtime.
 
         Args:
-            port (int): Port to start the Orchestrator on.
-            network_interface (str): Network interface to use for the Orchestrator.
+            port (int): Port to start the `Orchestrator` on.
+            network_interface (str): Network interface to use for the
+                `Orchestrator`.
 
         Returns:
-            tuple: The Experiment object, the Orchestrator object, and the entry database hostname.
+            tuple: The `Experiment` instance, the `Orchestrator` instance and
+                the IP address of the host of the database.
         """
         rlxout.small_banner('Starting Orchestrator...')
 
         # Generate flexi experiment
-        exp = Experiment('flexi', launcher=self.type)
+        exp = Experiment('relexi', launcher=self.type)
 
         # Initialize the orchestrator based on the orchestrator_type
         db = exp.create_database(
@@ -303,24 +262,24 @@ class ClusterManager:
             hosts=self.head if self.type in {'pbs', 'slurm'} else None,
         )
 
-        rlxout.info("Starting the Database...", newline=False)
+        rlxout.info('Starting the Orchestrator...', newline=False)
         try:
             exp.start(db)
         except Exception as e:
-            raise RuntimeError(f"Failed to start the Orchestrator: {e}") from e
-        rlxout.info("Success!", newline=False)
+            raise RuntimeError(f'Failed to start the Orchestrator: {e}') from e
+        rlxout.info('Success!', newline=False)
 
         entry_db = socket.gethostbyname(db.hosts[0])
-        rlxout.info("Use this command to shutdown database if not terminated correctly:")
-        rlxout.info(f"$(smart dbcli) -h {db.hosts[0]} -p {port} shutdown", newline=False)
+        rlxout.info('Use this command to shutdown database if not terminated correctly:')
+        rlxout.info(f'$(smart dbcli) -h {db.hosts[0]} -p {port} shutdown', newline=False)
 
         return exp, db, entry_db
 
     def _get_hostlist(self) -> List[str]:
         """Get the list of hosts the script is executed on.
 
-        Uses the scheduler type to determine the hostlist via the environment
-        variables set by the scheduler.
+        Uses the runtime type to determine the hostlist via the environment
+        variables set by the corresponding scheduler environment.
 
         Returns:
             list: List containing the hostnames as strings.
@@ -338,13 +297,13 @@ class ClusterManager:
         if self.type == 'slurm':
             return self._get_slurm_nodelist()
         raise NotImplementedError(
-            f"Method `get_hostlist` not implemented for scheduler type {self.type}!")
+            f'Method `get_hostlist` not implemented for runtime "{self.type}"!')
 
     def _read_pbs_nodefile(self) -> List[str]:
-        """Read the PBS_NODEFILE and return the list of nodes.
+        """Read the `PBS_NODEFILE` and return the list of nodes.
 
         NOTE:
-            The PBS_NODEFILE contains the list of nodes allocated to the job.
+            The `PBS_NODEFILE` contains the list of nodes allocated to the job.
             If a node provides multiple MPI slots, it is the corresponding
             number of times in the file.
 
@@ -352,10 +311,10 @@ class ClusterManager:
             list: List containing the hostnames as strings.
         """
         if self.type != 'pbs':
-            raise ValueError("Method 'read_pbs_nodefile' only available for PBS scheduler!")
-        node_file = os.environ['PBS_NODEFILE']
+            raise ValueError('Method "read_pbs_nodefile" only available for PBS scheduler!')
+        node_file = os.getenv('PBS_NODEFILE')
         if node_file is None:
-            raise KeyError("Environment variable 'PBS_NODEFILE' is not set!")
+            raise KeyError('Environment variable "PBS_NODEFILE" is not set!')
         with open(node_file, 'r', encoding='utf-8') as f:
             nodes = [line.strip() for line in f.readlines()]
         return nodes
@@ -367,16 +326,16 @@ class ClusterManager:
             list: List containing the unique hostnames as strings.
         """
         if self.type != 'slurm':
-            raise ValueError("Method 'get_slurm_nodelist' only available for SLURM scheduler!")
+            raise ValueError('Method "get_slurm_nodelist" only available for SLURM scheduler!')
         # Get the compressed list of nodes from SLURM_NODELIST
         node_list = os.getenv('SLURM_NODELIST')
         if node_list is None:
-            raise KeyError("Environment variable 'SLURM_NODELIST' is not set!")
+            raise KeyError('Environment variable "SLURM_NODELIST" is not set!')
         # Use scontrol to expand the node list
         result = subprocess.run(['scontrol', 'show', 'hostname', node_list], capture_output=True, text=True)
         # Check if the command was successful
         if result.returncode != 0:
-            raise RuntimeError(f"scontrol command failed: {result.stderr.strip()}")
+            raise RuntimeError(f'scontrol command failed: {result.stderr.strip()}')
         # Split the output into individual hostnames
         return result.stdout.strip().split('\n')
 

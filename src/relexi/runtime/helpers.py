@@ -17,7 +17,7 @@ import shutil
 def generate_rankfile_ompi(hosts, cores_per_node, n_par_env, ranks_per_env, base_path=None):
     """Generate rank file for OpenMPI process binding.
 
-    Args: 
+    Args:
         hosts (list): List of hostnames
         cores_per_node (int): Number of cores per node
         n_par_env (int): Number of parallel environments to be launched
@@ -30,9 +30,9 @@ def generate_rankfile_ompi(hosts, cores_per_node, n_par_env, ranks_per_env, base
 
     # If no base_path given, use CWD
     if base_path:
-        rankfile_dir = os.path.join(base_path, "ompi-rankfiles")
+        rankfile_dir = os.path.join(base_path, 'ompi-rankfiles')
     else:
-        rankfile_dir = "ompi-rankfiles"
+        rankfile_dir = 'ompi-rankfiles'
 
     if os.path.exists(rankfile_dir):
         shutil.rmtree(rankfile_dir)
@@ -42,11 +42,11 @@ def generate_rankfile_ompi(hosts, cores_per_node, n_par_env, ranks_per_env, base
     next_free_slot = 0
     n_cores_used = 0
     for env_idx in range(n_par_env):
-        filename = os.path.join(rankfile_dir, f"par_env_{env_idx:05d}")
+        filename = os.path.join(rankfile_dir, f'par_env_{env_idx:05d}')
         rankfiles.append(filename)
         with open(filename, 'w', encoding='utf-8') as rankfile:
             for i in range(ranks_per_env):
-                rankfile.write(f"rank {i}={hosts[n_cores_used//cores_per_node]} slot={next_free_slot}\n")
+                rankfile.write(f'rank {i}={hosts[n_cores_used//cores_per_node]} slot={next_free_slot}\n')
                 next_free_slot = next_free_slot + 1
                 n_cores_used = n_cores_used + 1
                 if next_free_slot > (cores_per_node - 1):
@@ -70,11 +70,11 @@ def parser_flexi_parameters(parameter_file, keyword, value):
     Returns:
         str: Path to new (modified) parameter file
     """
-    pattern = re.compile(fr"({keyword})\s*=.*", re.IGNORECASE)
-    subst = keyword + "=" + value
+    pattern = re.compile(fr'({keyword})\s*=.*', re.IGNORECASE)
+    subst = keyword + '=' + value
     parameter_file_in = parameter_file
     pbs_job_id = os.environ['PBS_JOBID']
-    parameter_file_out = f"parameter_flexi-{pbs_job_id[0:7]}.ini"
+    parameter_file_out = f'parameter_flexi-{pbs_job_id[0:7]}.ini'
 
     with open(parameter_file_out, 'w', encoding='utf-8') as new_file:
         with open(parameter_file_in, 'r', encoding='utf-8') as old_file:
@@ -83,7 +83,7 @@ def parser_flexi_parameters(parameter_file, keyword, value):
     return parameter_file_out
 
 
-def clean_ompi_tmpfiles(env_variable="TMPDIR"):
+def clean_ompi_tmpfiles(env_variable='TMPDIR'):
     """Cleans up temporary files created by OpenMPI.
 
     OpenMPI creates temporary files with each invocation, which might cause the
@@ -96,13 +96,12 @@ def clean_ompi_tmpfiles(env_variable="TMPDIR"):
             folder for termporary files is stored.
 
     Returns:
-        int:
-            * 1 if operation was successfull,
-            * -1 otherwise.
+        int: Returns
+        - `1` if operation was successfull,
+        - `-1` otherwise.
     """
-    try:
-        tmpdir = os.environ[env_variable]
-    except Exception:
+    tmpdir = os.geten(env_variable)
+    if tmpdir is None:
         return -1
 
     path = os.path.join(tmpdir, 'ompi.*')
@@ -160,7 +159,7 @@ def copy_to_nodes(my_files, base_path, hosts, subfolder=None):
         os.system(f'ssh {host} mkdir -p {target}')
         # Copy files
         for my_file in my_files:
-            os.system(f'scp -q "{my_file}" "{host}:{target}"')
+            os.system(f'scp -q {my_file} {host}:{target}')
 
     # Get new path of files
     my_files_new = []
