@@ -4,8 +4,10 @@
 
 import os
 import socket
+import subprocess
 from typing import List, Optional
 
+import smartsim
 from smartsim import Experiment
 from smartsim.database.orchestrator import Orchestrator
 
@@ -66,7 +68,7 @@ class ClusterManager:
 
     def __init__(
             self,
-            scheduler_type: Optional[str] = 'local',
+            scheduler_type: Optional[str] = 'auto',
             db_network_interface: Optional[str] = 'lo',
             db_port: Optional[int] = 6790
             ):
@@ -74,15 +76,24 @@ class ClusterManager:
 
         Args:
             scheduler_type (str, optional): Type of the cluster manager.
-                Must be `'local'`, `'pbs'`, or `'slurm'`. Defaults to `'local'`.
+                Must be `'local'`, `'pbs'`, `'slurm'` or `'auto'`. Defaults to
+                `'auto'`, for which the type of cluster environment iss
+                identified automatically.
             db_network_interface (str, optional): Network interface to use for
                 the Orchestrator. Defaults to `'lo'`.
             db_port (int, optional): Port to start the Orchestrator on.
                 Defaults to `6790`.
         """
-        self.type = scheduler_type.casefold().strip()
-        rlxout.info(f'Trying to identify {self.type} training environment...')
+        # Using SmartSim utility to identify type automatically
+        if scheduler_type == 'auto':
+            rlxout.info('Trying to identify cluster environment...')
+            scheduler = smartsim.wlm.detect_launcher()
+            rlxout.info(f'Found "{scheduler}" environment!', newline=False)
+            self.type = scheduler.casefold().strip()
+        else:
+            self.type = scheduler_type.casefold().strip()
 
+        rlxout.info(f'Trying to setup "{self.type}" environment...')
         try:
             self._hosts = self._get_hostlist()
         except Exception as e:
@@ -98,7 +109,7 @@ class ClusterManager:
                 raise RuntimeError('Failed to setup local training environment!') from e
         rlxout.info('Success!', newline=False)
 
-        self.db = None
+        self._db = None
         self._exp, self._db, self._db_entry = self._launch_orchestrator(
             port=db_port,
             network_interface=db_network_interface,
@@ -329,7 +340,7 @@ class ClusterManager:
         raise NotImplementedError(
             f"Method `get_hostlist` not implemented for scheduler type {self.type}!")
 
-    def _read_pbs_nodefile() -> List[str]:
+    def _read_pbs_nodefile(self) -> List[str]:
         """Read the PBS_NODEFILE and return the list of nodes.
 
         NOTE:
@@ -349,7 +360,7 @@ class ClusterManager:
             nodes = [line.strip() for line in f.readlines()]
         return nodes
 
-    def _get_slurm_nodelist() -> List[str]:
+    def _get_slurm_nodelist(self) -> List[str]:
         """Get the list of hosts from the SLURM_NODELIST environment variable.
 
         Returns:

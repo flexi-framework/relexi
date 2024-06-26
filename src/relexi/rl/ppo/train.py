@@ -110,6 +110,7 @@ def train( config_file
     resources = relexi.cluster_manager.ClusterManager(
                                     scheduler_type=smartsim_orchestrator,
                                     db_port=smartsim_port,
+                                    db_network_interface='ibp94s0',
                                     )
     resources.info()
 
@@ -170,7 +171,7 @@ def train( config_file
                                                  ,parameter_file
                                                  ,tag              = 'train'
                                                  ,port             = smartsim_port
-                                                 ,entry_db         = resources.entry_db
+                                                 ,entry_db         = resources.db_entry
                                                  ,hosts            = resources.workers
                                                  ,n_envs           = num_parallel_environments
                                                  ,n_procs          = num_procs_per_environment
@@ -197,7 +198,7 @@ def train( config_file
                                                       ,parameter_file
                                                       ,tag              = 'eval'
                                                       ,port             = smartsim_port
-                                                      ,entry_db         = resources.entry_db
+                                                      ,entry_db         = resources.db_entry
                                                       ,hosts            = resources.workers
                                                       ,n_procs          = num_procs_per_environment
                                                       ,n_procs_per_node = n_procs_per_node
@@ -389,5 +390,5 @@ def train( config_file
     del my_env
     del my_eval_env
 
-    exp.stop(db)
+    del resources
     time.sleep(2.) # Wait for orchestrator to be properly closed
