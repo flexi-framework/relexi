@@ -166,16 +166,12 @@ def train( config_file
 
     # Instantiate parallel collection environment
     my_env = tf_py_environment.TFPyEnvironment(
-             relexi.env.flexiEnvSmartSim.flexiEnv(runtime.exp
+             relexi.env.flexiEnvSmartSim.flexiEnv(runtime
                                                  ,executable_path
                                                  ,parameter_file
                                                  ,tag              = 'train'
-                                                 ,port             = smartsim_port
-                                                 ,entry_db         = runtime.db_entry
-                                                 ,hosts            = runtime.workers
                                                  ,n_envs           = num_parallel_environments
                                                  ,n_procs          = num_procs_per_environment
-                                                 ,n_procs_per_node = n_procs_per_node
                                                  ,spectra_file     = reward_spectrum_file
                                                  ,reward_kmin      = reward_kmin
                                                  ,reward_kmax      = reward_kmax
@@ -193,15 +189,11 @@ def train( config_file
         eval_files = train_files
 
     my_eval_env = tf_py_environment.TFPyEnvironment(
-                  relexi.env.flexiEnvSmartSim.flexiEnv(runtime.exp
+                  relexi.env.flexiEnvSmartSim.flexiEnv(runtime
                                                       ,executable_path
                                                       ,parameter_file
                                                       ,tag              = 'eval'
-                                                      ,port             = smartsim_port
-                                                      ,entry_db         = runtime.db_entry
-                                                      ,hosts            = runtime.workers
                                                       ,n_procs          = num_procs_per_environment
-                                                      ,n_procs_per_node = n_procs_per_node
                                                       ,spectra_file     = reward_spectrum_file
                                                       ,reward_kmin      = reward_kmin
                                                       ,reward_kmax      = reward_kmax

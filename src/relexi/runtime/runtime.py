@@ -7,6 +7,8 @@ import socket
 import subprocess
 from typing import List, Optional, Union
 
+import numpy as np
+
 import smartsim
 from smartsim import Experiment
 from smartsim.database.orchestrator import Orchestrator
@@ -49,9 +51,9 @@ class Runtime:
         workers (list): List of worker nodes (contains only `localhost` if in
             **Local Mode**).
         db (Orchestrator): The launched `Orchestrator` database from the
-            `smartsim` package.
-        db_entry (str): IP address of the host of the database. Required to
-            connect a client to the database.
+            `smartsim` packagev.
+        db_entry (str): IP address and port of the host of the database.
+            Takes the form `IP_ADDRESS:PORT`.
         exp (Experiment): The `Experiment` object the `Orchestrator` is
             launched with.
 
@@ -133,6 +135,104 @@ class Runtime:
             rlxout.info(f'  Workers:   {self.workers}', newline=False)
         else:
             rlxout.info(f'Running in LOCAL mode on: {self.head}')
+
+    def launch_models(
+            self,
+            exe: Union[str, List[str]],
+            exe_args: Union[str, List[str]],
+            exe_name: Union[str, List[str]],
+            n_procs: Union[int, List[int]],
+            n_exe: Optional[int] = 1,
+            launcher: Optional[str] = 'local'
+            ) -> List[smartsim.entity.model.Model]:
+        """Launch the models on the available nodes.
+
+        Args:
+            exe (str, List(str)): Path to the executable to launch. Can either
+                be a single path or a list of length `n_exe`. If only a single
+                path is provided, it is used for all executables.
+            exe_args (str, List(str)): Arguments to pass to the executable. Can
+                either be a single string or a list of length `n_exe`. If only
+                a single string is provided, it is used for all executables.
+            exe_name (str, List(str)): Name of the executable used to identify
+                launched model in the SmartSim context. Can either be a single
+                string or a list of length `n_exe`. If only a single string is
+                provided, it is used for all executables.
+            n_procs (int, List(int)): Number of processes to launch. Can either
+                be a single integer or a list of length `n_exe`. If only a
+                single integer is provided, it is used for all executables.
+            n_exe (int): Number of executables to launch. Defaults to `1`.
+            launcher (str): Launcher to use for the executable. Must be one of
+                `'mpirun'`, `'srun'`, or `'local'`.
+        """
+        def _validate_args(arg, n):
+            """Validate the length of the arguments."""
+            if isinstance(arg, list) and not len(arg) == n:
+                raise ValueError(f'Expected {n} entries, but got {len(arg)}!')
+            if not isinstance(arg, list):
+                return [arg] * n
+            return arg
+
+        # Validate that arguments are of correct length
+        exe = _validate_args(exe, n_exe)
+        exe_args = _validate_args(exe_args, n_exe)
+        exe_name = _validate_args(exe_name, n_exe)
+        n_procs = _validate_args(n_procs, n_exe)
+
+        # Check compatibility of launcher and scheduler type
+        if launcher == 'local':
+            if any(n_procs > 1):
+                raise ValueError('Local launcher only supports single process execution!')
+        if (launcher == 'srun') and (self.type != 'slurm'):
+            raise ValueError('srun launcher only supported for SLURM scheduler!')
+
+        # Ensure we have sufficient procs available
+        procs_avail = self._get_total_worker_slots()
+        procs_requested = sum(n_procs)
+        if procs_requested > procs_avail:
+            raise ValueError(f'Not enough processes available! Requested: {procs_requested}, Available: {procs_avail}')
+        if min(n_procs) < 1:
+            raise ValueError('At least one process must be requested per executable!')
+
+        # Distribute the executables to the available nodes for SLURM
+        # TODO: Precompute and store placement
+        if self.type == 'slurm':
+            slurm_hosts_per_exe = self._distribute_workers_slurm(
+                                                                 n_procs,
+                                                                 n_exe,
+                                                                 procs_avail
+                                                                 )
+
+        models = []
+        for i in range(n_exe):
+            if launcher == 'local':
+                run_args = None
+            elif launcher == 'mpirun':
+                run_args = {
+                    #'rankfile': self.rankfiles[i],
+                    'report-bindings': None
+                }
+            elif launcher == 'srun':
+                run_args = {
+                    'mpi': 'pmix',
+                    'nodelist': ','.join(slurm_hosts_per_exe[i]),
+                    'distribution': 'block:block:block,Pack',
+                    'cpu-bind': 'verbose',
+                    'exclusive': None,
+                }
+            run = self.exp.create_run_settings(
+                                              exe=exe[i],
+                                              exe_args=exe_args[i],
+                                              run_command=launcher,
+                                              run_args=run_args
+                                              )
+            run.set_tasks(n_procs[i])
+
+            model = self.exp.create_model(exe_name[i], run)
+            self.exp.start(model, block=False, summary=False)
+            models.append(model)
+
+        return models
 
     @property
     def type(self) -> str:
@@ -218,10 +318,10 @@ class Runtime:
 
     @property
     def db_entry(self) -> str:
-        """Get the IP address of the host of the database.
+        """Get IP address of database.
 
         Returns:
-            str: IP address of the host of the database.
+            str: Address of the database. Takes the form `IP_ADDRESS:PORT`.
         """
         return self._db_entry
 
@@ -269,11 +369,11 @@ class Runtime:
             raise RuntimeError(f'Failed to start the Orchestrator: {e}') from e
         rlxout.info('Success!', newline=False)
 
-        entry_db = socket.gethostbyname(db.hosts[0])
+        db_entry = socket.gethostbyname(db.hosts[0])
         rlxout.info('Use this command to shutdown database if not terminated correctly:')
         rlxout.info(f'$(smart dbcli) -h {db.hosts[0]} -p {port} shutdown', newline=False)
 
-        return exp, db, entry_db
+        return exp, db, f'{db_entry}:{port}'
 
     def _get_hostlist(self) -> List[str]:
         """Get the list of hosts the script is executed on.
@@ -291,15 +391,15 @@ class Runtime:
         if self.type == 'local':
             return [self._get_local_hostname()]
         if self.type == 'pbs':
-            nodes = self._read_pbs_nodefile()
+            nodes = self._get_hostlist_pbs()
             # Get the list of unique nodes via casting into set and list again
             return list(set(nodes))
         if self.type == 'slurm':
-            return self._get_slurm_nodelist()
+            return self._get_hostlist_slurm()
         raise NotImplementedError(
             f'Method `get_hostlist` not implemented for runtime "{self.type}"!')
 
-    def _read_pbs_nodefile(self) -> List[str]:
+    def _get_hostlist_pbs(self) -> List[str]:
         """Read the `PBS_NODEFILE` and return the list of nodes.
 
         NOTE:
@@ -314,12 +414,12 @@ class Runtime:
             raise ValueError('Method "read_pbs_nodefile" only available for PBS scheduler!')
         node_file = os.getenv('PBS_NODEFILE')
         if node_file is None:
-            raise KeyError('Environment variable "PBS_NODEFILE" is not set!')
+            raise KeyError('Environment variable "PBS_NODEFILE" not found!')
         with open(node_file, 'r', encoding='utf-8') as f:
             nodes = [line.strip() for line in f.readlines()]
         return nodes
 
-    def _get_slurm_nodelist(self) -> List[str]:
+    def _get_hostlist_slurm(self) -> List[str]:
         """Get the list of hosts from the SLURM_NODELIST environment variable.
 
         Returns:
@@ -330,7 +430,7 @@ class Runtime:
         # Get the compressed list of nodes from SLURM_NODELIST
         node_list = os.getenv('SLURM_NODELIST')
         if node_list is None:
-            raise KeyError('Environment variable "SLURM_NODELIST" is not set!')
+            raise KeyError('Environment variable "SLURM_NODELIST" not found!')
         # Use scontrol to expand the node list
         result = subprocess.run(['scontrol', 'show', 'hostname', node_list], capture_output=True, text=True)
         # Check if the command was successful
@@ -338,6 +438,86 @@ class Runtime:
             raise RuntimeError(f'scontrol command failed: {result.stderr.strip()}')
         # Split the output into individual hostnames
         return result.stdout.strip().split('\n')
+
+    def _get_total_worker_slots(self) -> int:
+        """Get the total number of worker slots available in the runtime.
+
+        Returns:
+            int: Number of slots per worker node.
+        """
+        if self.type == 'local':
+            # Leave one core for the head node
+            return os.cpu_count()-1
+
+        if self.type == 'pbs':
+            # Get all slots from PBS_NODEFILE. Multiple slots per node
+            # correspond to multiple entries in the file.
+            nodes = self._get_hostlist_pbs()
+            slots = np.zeros(len(self.workers), dtype=int)
+            for i, worker in enumerate(self.workers):
+                slots[i] = nodes.count(worker)
+            return np.sum(slots)
+
+        if self.type == 'slurm':
+            # Get the number of slots per node from SLURM_CPUS_PER_NODE
+            slots = os.getenv('SLURM_JOB_CPUS_PER_NODE')
+            if slots is None:
+                raise KeyError('Environment variable "SLURM_JOB_CPUS_PER_NODE" not found!')
+            # Parse only first integer part from string (has form '24(x4)').
+            slots_int = ""
+            for char in slots:
+                if char.isdigit():
+                    slots_int += char
+                else:
+                    break
+            return int(slots_int)*len(self.workers)
+
+        raise NotImplementedError(
+            f'Method `get_slots_per_worker` not implemented for runtime "{self.type}"!')
+
+    def _distribute_workers_slurm(self, n_procs: List[int], n_exe: int, procs_avail: int) -> List[List[str]]:
+        """Distribute the executables to the available nodes for SLURM.
+
+        Uses two different strategies to distribute the executables to the
+        available nodes. Either multiple executables per node or multiple nodes
+        per executable. However, a single executable cannot be placed on parts
+        of multiple nodes, since this causes problems with SLURM. Either
+        executable spans multiple whole nodes, or single partial node.
+
+        Args:
+            n_procs (List[int]): Number of processes to launch per executable.
+            n_exe (int): Number of executables to launch.
+            procs_avail (int): Number of available processes.
+
+        Returns:
+            List[List[str]]: List of lists containing the hostnames for each
+                executable.
+        """
+        procs_per_worker = procs_avail//len(self.workers)
+        nodes_avail = self.workers
+        slurm_hosts_per_exe = []
+        # Either multiple executables per node or multiple nodes per executable
+        if max(n_procs) > procs_per_worker:
+            # Use whole nodes per executable
+            for i in range(n_exe):
+                n_nodes_req = int(np.ceil(n_procs[i]/procs_per_worker))
+                current_hosts = []
+                for _ in range(n_nodes_req):
+                    current_hosts.append(nodes_avail.pop(0))
+                slurm_hosts_per_exe.append(current_hosts)
+        else:
+            # Distribute processes to nodes
+            cores_avail = procs_per_worker
+            for i in range(n_exe):
+                # Exe does not fit on node
+                if n_procs[i] > cores_avail:
+                    if len(nodes_avail) <= 1:
+                        raise RuntimeError('Failed to distribute models to resources!')
+                    # Take next node
+                    nodes_avail.pop(0)
+                    cores_avail = procs_per_worker
+                slurm_hosts_per_exe.append([nodes_avail[0]])
+        return slurm_hosts_per_exe
 
     def _get_local_hostname(self) -> str:
         """Get the hostname of the machine executing the Python script.

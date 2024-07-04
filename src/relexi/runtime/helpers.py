@@ -100,7 +100,7 @@ def clean_ompi_tmpfiles(env_variable='TMPDIR'):
         - `1` if operation was successfull,
         - `-1` otherwise.
     """
-    tmpdir = os.geten(env_variable)
+    tmpdir = os.getenv(env_variable)
     if tmpdir is None:
         return -1
 
