@@ -244,16 +244,17 @@ class LaunchConfig():
                     current_hosts.append(nodes_avail.pop(0))
                 slurm_hosts_per_exe.append(current_hosts)
         else:
-            # Distribute processes to nodes
+            # Use multiple executables peper
             cores_avail = procs_per_worker
             for i in range(n_exe):
-                # Exe does not fit on node
+                # Does not fit on remaining slots on node
                 if n_procs[i] > cores_avail:
                     if len(nodes_avail) <= 1:
                         raise RuntimeError('Failed to distribute models to resources!')
                     # Take next node
                     nodes_avail.pop(0)
                     cores_avail = procs_per_worker
+                cores_avail -= n_procs[i]
                 slurm_hosts_per_exe.append([nodes_avail[0]])
         return slurm_hosts_per_exe
 
