@@ -14,10 +14,10 @@ from smartsim import Experiment
 from smartsim.database.orchestrator import Orchestrator
 
 import relexi.io.output as rlxout
-from relexi.runtime.helpers import generate_rankfile_ompi
+from relexi.runtime import LaunchConfig
 
 
-class Runtime:
+class Runtime():
     """Class containing information about and handling the HPC environment.
 
     This class defines the interface for an HPC runtime, which contains all
@@ -50,12 +50,15 @@ class Runtime:
             **Local Mode**).
         workers (list): List of worker nodes (contains only `localhost` if in
             **Local Mode**).
+        n_worker_slots (int): Total number of slots available on workers.
         db (Orchestrator): The launched `Orchestrator` database from the
             `smartsim` packagev.
         db_entry (str): IP address and port of the host of the database.
             Takes the form `IP_ADDRESS:PORT`.
         exp (Experiment): The `Experiment` object the `Orchestrator` is
             launched with.
+        launch_config (LaunchConfig): CurrentcConfiguration for launching a
+            batch of executables in the runtime.
 
     Raises:
         ValueError: If the scheduler type is not supported.
@@ -116,6 +119,8 @@ class Runtime:
             port=db_port,
             network_interface=db_network_interface,
         )
+        self.launch_config = None
+        self.n_worker_slots = self._get_total_worker_slots()
 
     def __del__(self):
         if self.db:
@@ -180,53 +185,50 @@ class Runtime:
         n_procs = _validate_args(n_procs, n_exe)
 
         # Check compatibility of launcher and scheduler type
-        if launcher == 'local':
-            if any(n_procs > 1):
-                raise ValueError('Local launcher only supports single process execution!')
+        if (launcher == 'local') and (max(n_procs) > 1):
+            raise ValueError('Local launcher only supports single process execution!')
         if (launcher == 'srun') and (self.type != 'slurm'):
             raise ValueError('srun launcher only supported for SLURM scheduler!')
 
-        # Ensure we have sufficient procs available
-        procs_avail = self._get_total_worker_slots()
-        procs_requested = sum(n_procs)
-        if procs_requested > procs_avail:
-            raise ValueError(f'Not enough processes available! Requested: {procs_requested}, Available: {procs_avail}')
-        if min(n_procs) < 1:
-            raise ValueError('At least one process must be requested per executable!')
-
-        # Distribute the executables to the available nodes for SLURM
-        # TODO: Precompute and store placement
-        if self.type == 'slurm':
-            slurm_hosts_per_exe = self._distribute_workers_slurm(
-                                                                 n_procs,
-                                                                 n_exe,
-                                                                 procs_avail
-                                                                 )
+        # Check if launch config is up-to-date and create or update if required
+        config_dict = {'type': launcher,
+                       'n_exe': n_exe,
+                       'n_procs': n_procs,
+                       'workers': self.workers}
+        if self.launch_config is None:
+            self.launch_config = LaunchConfig.from_dict(config_dict, self)
+        else:
+            if not self.launch_config.is_compatible(config_dict):
+                self.launch_config.config = config_dict
 
         models = []
         for i in range(n_exe):
             if launcher == 'local':
-                run_args = None
-            elif launcher == 'mpirun':
-                run_args = {
-                    #'rankfile': self.rankfiles[i],
-                    'report-bindings': None
-                }
-            elif launcher == 'srun':
-                run_args = {
-                    'mpi': 'pmix',
-                    'nodelist': ','.join(slurm_hosts_per_exe[i]),
-                    'distribution': 'block:block:block,Pack',
-                    'cpu-bind': 'verbose',
-                    'exclusive': None,
-                }
-            run = self.exp.create_run_settings(
-                                              exe=exe[i],
-                                              exe_args=exe_args[i],
-                                              run_command=launcher,
-                                              run_args=run_args
-                                              )
-            run.set_tasks(n_procs[i])
+                run = self.exp.create_run_settings(
+                                                  exe=exe[i],
+                                                  exe_args=exe_args[i],
+                                                  )
+            else:
+                if launcher == 'mpirun':
+                    run_args = {
+                        'rankfile': self.launch_config.rankfiles[i],
+                        'report-bindings': None
+                    }
+                elif launcher == 'srun':
+                    run_args = {
+                        'mpi': 'pmix',
+                        'nodelist': ','.join(self.launch_config.hosts_per_exe[i]),
+                        'distribution': 'block:block:block,Pack',
+                        'cpu-bind': 'verbose',
+                        'exclusive': None,
+                    }
+                run = self.exp.create_run_settings(
+                                                  exe=exe[i],
+                                                  exe_args=exe_args[i],
+                                                  run_command=launcher,
+                                                  run_args=run_args
+                                                  )
+                run.set_tasks(n_procs[i])
 
             model = self.exp.create_model(exe_name[i], run)
             self.exp.start(model, block=False, summary=False)
@@ -474,50 +476,6 @@ class Runtime:
 
         raise NotImplementedError(
             f'Method `get_slots_per_worker` not implemented for runtime "{self.type}"!')
-
-    def _distribute_workers_slurm(self, n_procs: List[int], n_exe: int, procs_avail: int) -> List[List[str]]:
-        """Distribute the executables to the available nodes for SLURM.
-
-        Uses two different strategies to distribute the executables to the
-        available nodes. Either multiple executables per node or multiple nodes
-        per executable. However, a single executable cannot be placed on parts
-        of multiple nodes, since this causes problems with SLURM. Either
-        executable spans multiple whole nodes, or single partial node.
-
-        Args:
-            n_procs (List[int]): Number of processes to launch per executable.
-            n_exe (int): Number of executables to launch.
-            procs_avail (int): Number of available processes.
-
-        Returns:
-            List[List[str]]: List of lists containing the hostnames for each
-                executable.
-        """
-        procs_per_worker = procs_avail//len(self.workers)
-        nodes_avail = self.workers
-        slurm_hosts_per_exe = []
-        # Either multiple executables per node or multiple nodes per executable
-        if max(n_procs) > procs_per_worker:
-            # Use whole nodes per executable
-            for i in range(n_exe):
-                n_nodes_req = int(np.ceil(n_procs[i]/procs_per_worker))
-                current_hosts = []
-                for _ in range(n_nodes_req):
-                    current_hosts.append(nodes_avail.pop(0))
-                slurm_hosts_per_exe.append(current_hosts)
-        else:
-            # Distribute processes to nodes
-            cores_avail = procs_per_worker
-            for i in range(n_exe):
-                # Exe does not fit on node
-                if n_procs[i] > cores_avail:
-                    if len(nodes_avail) <= 1:
-                        raise RuntimeError('Failed to distribute models to resources!')
-                    # Take next node
-                    nodes_avail.pop(0)
-                    cores_avail = procs_per_worker
-                slurm_hosts_per_exe.append([nodes_avail[0]])
-        return slurm_hosts_per_exe
 
     def _get_local_hostname(self) -> str:
         """Get the hostname of the machine executing the Python script.

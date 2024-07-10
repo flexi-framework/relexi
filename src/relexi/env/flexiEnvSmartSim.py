@@ -51,7 +51,6 @@ class flexiEnv(py_environment.PyEnvironment):
                  random_restart_file=True,
                  debug=0,
                  tag=None,
-                 rankfiles=None,
                  mpi_launch_mpmd=False,
                  env_launcher='mpirun'
                  ):
@@ -61,7 +60,6 @@ class flexiEnv(py_environment.PyEnvironment):
         self.n_procs = n_procs
         self.prm_file = prm_file
         self.flexi_path = flexi_path
-        self.rankfiles = rankfiles
 
         # Save values for reward function
         self.reward_kmin = reward_kmin
@@ -73,9 +71,8 @@ class flexiEnv(py_environment.PyEnvironment):
         # Sanity Check Launcher
         self.env_launcher = env_launcher
         if ((self.env_launcher == 'local') and (n_procs != 1)):
-            rlxout.warning("For env_launcher 'local', only single execution is allowed! Setting 'n_procs=1'!")
-            rlxout.warning("To run evironments in parallel with MPI, use env_launcher='mpi'!")
-            n_procs = 1
+            rlxout.warning("For env_launcher 'local', only single execution is allowed! Setting 'n_procs=1'")
+            self.n_procs = 1
 
         if self.env_launcher == 'mpirun':
             self.mpi_launch_mpmd = mpi_launch_mpmd
@@ -274,7 +271,7 @@ class flexiEnv(py_environment.PyEnvironment):
         do_init = True
         key = "state"
         for tag in self.tag:
-            self.client.poll_tensor(tag+key, 10, 10000)
+            self.client.poll_tensor(tag+key, 10, 1000)
             try:
                 data = self.client.get_tensor(tag+key)
             except Exception:

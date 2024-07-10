@@ -14,46 +14,6 @@ import glob
 import shutil
 
 
-def generate_rankfile_ompi(hosts, cores_per_node, n_par_env, ranks_per_env, base_path=None):
-    """Generate rank file for OpenMPI process binding.
-
-    Args:
-        hosts (list): List of hostnames
-        cores_per_node (int): Number of cores per node
-        n_par_env (int): Number of parallel environments to be launched
-        ranks_per_env (int): Number of ranks per environments
-        base_path (str): (Optional.) Path to the directory of the rank files
-
-    Returns:
-        list: List of filenames of the rankfiles
-    """
-
-    # If no base_path given, use CWD
-    if base_path:
-        rankfile_dir = os.path.join(base_path, 'ompi-rankfiles')
-    else:
-        rankfile_dir = 'ompi-rankfiles'
-
-    if os.path.exists(rankfile_dir):
-        shutil.rmtree(rankfile_dir)
-    os.makedirs(rankfile_dir, exist_ok=True)
-
-    rankfiles = []
-    next_free_slot = 0
-    n_cores_used = 0
-    for env_idx in range(n_par_env):
-        filename = os.path.join(rankfile_dir, f'par_env_{env_idx:05d}')
-        rankfiles.append(filename)
-        with open(filename, 'w', encoding='utf-8') as rankfile:
-            for i in range(ranks_per_env):
-                rankfile.write(f'rank {i}={hosts[n_cores_used//cores_per_node]} slot={next_free_slot}\n')
-                next_free_slot = next_free_slot + 1
-                n_cores_used = n_cores_used + 1
-                if next_free_slot > (cores_per_node - 1):
-                    next_free_slot = 0
-    return rankfiles
-
-
 def parser_flexi_parameters(parameter_file, keyword, value):
     """Changes the value for a keyword in a FLEXI parameter file.
 
