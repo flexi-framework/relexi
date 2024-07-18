@@ -287,7 +287,7 @@ class Runtime():
         Returns:
             str: Hostname of the Head node.
         """
-        return self._get_local_hostname()
+        return self.hosts[0]
 
     @property
     def workers(self) -> List[str]:
@@ -299,12 +299,11 @@ class Runtime():
             list: List containing the hostnames of Workers as strings.
         """
         if self.is_distributed:
-            local_host = self._get_local_hostname()
             workers = self.hosts.copy()
-            if local_host in workers:
-                workers.remove(local_host)
+            if self.head in workers:
+                workers.remove(self.head)
             else:
-                rlxout.warning(f'Localhost "{local_host}" not found in hosts list:')
+                rlxout.warning(f'Localhost "{self.head}" not found in hosts list:')
                 rlxout.warning(f'  {workers}')
             return workers
         return self.hosts
@@ -352,9 +351,7 @@ class Runtime():
             tuple: The `Experiment` instance, the `Orchestrator` instance and
                 the IP address of the host of the database.
         """
-        rlxout.small_banner('Starting Orchestrator...')
-
-        # Generate flexi experiment
+        # Generate relexi experiment
         exp = Experiment('relexi', launcher=self.type)
 
         # Initialize the orchestrator based on the orchestrator_type
