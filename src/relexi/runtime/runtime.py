@@ -76,7 +76,8 @@ class Runtime():
             self,
             type_: Optional[str] = 'auto',
             db_network_interface: Optional[str] = 'lo',
-            db_port: Optional[int] = 6790
+            db_port: Optional[int] = 6790,
+            do_launch_orchestrator: Optional[bool] = True
             ):
         """Initialize the Runtime.
 
@@ -88,6 +89,8 @@ class Runtime():
                 the Orchestrator. Defaults to `'lo'`.
             db_port (int, optional): Port to start the Orchestrator on.
                 Defaults to `6790`.
+            do_launch_orchestrator (bool, optional): Whether to launch the
+                `Orchestrator` immediately. Defaults to `True`.
         """
         # Using SmartSim utility to identify type automatically
         try:
@@ -101,9 +104,12 @@ class Runtime():
 
             rlxout.info(f'Setting up "{self.type}" runtime...')
             self._hosts = self._get_hostlist()
+            # Check that actually sufficient hosts found
+            if type_ != 'local' and len(self._hosts) < 2:
+                raise ValueError('Less than 2 hosts found in environment!')
         except Exception as e:
             rlxout.warning(f'Failed: {e}')
-            if self.type != 'local':
+            if type_ != 'local':
                 rlxout.info('Trying to setup LOCAL runtime instead...', newline=False)
                 try:
                     self.type = 'local'
@@ -114,11 +120,17 @@ class Runtime():
                 raise RuntimeError('Failed to setup LOCAL training environment!') from e
         rlxout.info('Success!', newline=False)
 
+        self._exp = None
         self._db = None
-        self._exp, self._db, self._db_entry = self._launch_orchestrator(
-            port=db_port,
-            network_interface=db_network_interface,
-        )
+        self._db_entry = None
+        if do_launch_orchestrator:
+            try:
+                self._exp, self._db, self._db_entry = self._launch_orchestrator(
+                    port=db_port,
+                    network_interface=db_network_interface,
+                )
+            except Exception as e:
+                raise RuntimeError('Failed to launch the Orchestrator!') from e
         self.launch_config = None
         self.n_worker_slots = self._get_total_worker_slots()
 
@@ -287,7 +299,7 @@ class Runtime():
         Returns:
             str: Hostname of the Head node.
         """
-        return self.hosts[0]
+        return self._get_local_hostname()
 
     @property
     def workers(self) -> List[str]:
@@ -374,11 +386,9 @@ class Runtime():
 
         return exp, db, f'{db_entry}:{port}'
 
+
     def _get_hostlist(self) -> List[str]:
         """Get the list of hosts the script is executed on.
-
-        Uses the runtime type to determine the hostlist via the environment
-        variables set by the corresponding scheduler environment.
 
         Returns:
             list: List containing the hostnames as strings.
@@ -390,53 +400,55 @@ class Runtime():
         if self.type == 'local':
             return [self._get_local_hostname()]
         if self.type == 'pbs':
-            nodes = self._get_hostlist_pbs()
-            # Get the list of unique nodes via casting into set and list again
-            return list(set(nodes))
+            return smartsim.wlm.pbs.get_hosts()
         if self.type == 'slurm':
-            return self._get_hostlist_slurm()
+            return smartsim.wlm.slurm.get_hosts()
         raise NotImplementedError(
             f'Method `get_hostlist` not implemented for runtime "{self.type}"!')
 
-    def _get_hostlist_pbs(self) -> List[str]:
-        """Read the `PBS_NODEFILE` and return the list of nodes.
-
-        NOTE:
-            The `PBS_NODEFILE` contains the list of nodes allocated to the job.
-            If a node provides multiple MPI slots, it is the corresponding
-            number of times in the file.
+    def _get_slots_per_node_slurm(self) -> List[int]:
+        """Get the number of slots per node for the SLURM scheduler.
 
         Returns:
-            list: List containing the hostnames as strings.
+            list(int): List containing the number of slots per node.
+        """
+        if self.type != 'slurm':
+            raise ValueError('Method only available for SLURM scheduler!')
+        # 1. Get the nodelist
+        slots = os.getenv('SLURM_JOB_CPUS_PER_NODE')
+        if slots is None:
+            raise ValueError("SLURM_JOB_CPUS_PER_NODE is not set!")
+        # 2. split all entries at comma
+        nodelist = slots.split(',')
+        # 3. expand all compressed entries
+        expanded_list = []
+        for entry in nodelist:
+            if '(' in entry:
+                num_cpus, count = entry.split('(x')
+                num_cpus = int(num_cpus)
+                count = int(count[:-1])  # remove trailing ')'
+                expanded_list.extend([num_cpus] * count)
+            else:
+                expanded_list.append(int(entry))
+        return expanded_list
+
+    def _get_slots_per_node_pbs(self) -> List[int]:
+        """Get the number of slots per node for the PBS scheduler.
+
+        Returns:
+            list(int): List containing the number of slots per node.
         """
         if self.type != 'pbs':
-            raise ValueError('Method "read_pbs_nodefile" only available for PBS scheduler!')
+            raise ValueError('Method only available for PBS scheduler!')
+        # 1. Get the nodelist
         node_file = os.getenv('PBS_NODEFILE')
         if node_file is None:
             raise KeyError('Environment variable "PBS_NODEFILE" not found!')
+        # 2. Read the nodelist
         with open(node_file, 'r', encoding='utf-8') as f:
-            nodes = [line.strip() for line in f.readlines()]
-        return nodes
-
-    def _get_hostlist_slurm(self) -> List[str]:
-        """Get the list of hosts from the SLURM_NODELIST environment variable.
-
-        Returns:
-            list: List containing the unique hostnames as strings.
-        """
-        if self.type != 'slurm':
-            raise ValueError('Method "get_slurm_nodelist" only available for SLURM scheduler!')
-        # Get the compressed list of nodes from SLURM_NODELIST
-        node_list = os.getenv('SLURM_NODELIST')
-        if node_list is None:
-            raise KeyError('Environment variable "SLURM_NODELIST" not found!')
-        # Use scontrol to expand the node list
-        result = subprocess.run(['scontrol', 'show', 'hostname', node_list], capture_output=True, text=True)
-        # Check if the command was successful
-        if result.returncode != 0:
-            raise RuntimeError(f'scontrol command failed: {result.stderr.strip()}')
-        # Split the output into individual hostnames
-        return result.stdout.strip().split('\n')
+            nodes = [line.strip().split('.')[0] for line in f.readlines()]
+        # 3. Count the number of slots (i.e. lines) per node
+        return [nodes.count(host) for host in self.hosts]
 
     def _get_total_worker_slots(self) -> int:
         """Get the total number of worker slots available in the runtime.
@@ -447,30 +459,12 @@ class Runtime():
         if self.type == 'local':
             # Leave one core for the head node
             return os.cpu_count()-1
-
         if self.type == 'pbs':
-            # Get all slots from PBS_NODEFILE. Multiple slots per node
-            # correspond to multiple entries in the file.
-            nodes = self._get_hostlist_pbs()
-            slots = np.zeros(len(self.workers), dtype=int)
-            for i, worker in enumerate(self.workers):
-                slots[i] = nodes.count(worker)
-            return np.sum(slots)
-
+            slots_per_node = self._get_slots_per_node_pbs()
+            return np.sum(slots_per_node[1:])
         if self.type == 'slurm':
-            # Get the number of slots per node from SLURM_CPUS_PER_NODE
-            slots = os.getenv('SLURM_JOB_CPUS_PER_NODE')
-            if slots is None:
-                raise KeyError('Environment variable "SLURM_JOB_CPUS_PER_NODE" not found!')
-            # Parse only first integer part from string (has form '24(x4)').
-            slots_int = ""
-            for char in slots:
-                if char.isdigit():
-                    slots_int += char
-                else:
-                    break
-            return int(slots_int)*len(self.workers)
-
+            slots_per_node = self._get_slots_per_node_slurm()
+            return np.sum(slots_per_node[1:])
         raise NotImplementedError(
             f'Method `get_slots_per_worker` not implemented for runtime "{self.type}"!')
 
@@ -480,4 +474,4 @@ class Runtime():
         Returns:
             str: Hostname of the local machine executing the script.
         """
-        return socket.gethostname()
+        return socket.gethostname().split('.')[0]

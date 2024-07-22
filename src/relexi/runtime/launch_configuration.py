@@ -231,6 +231,8 @@ class LaunchConfig():
             List[List[str]]: List of lists containing the hostnames for each
                 executable.
         """
+        if sum(n_procs) > procs_avail:
+            raise RuntimeError('Failed to distribute models to resources!')
         procs_per_worker = procs_avail//len(workers)
         nodes_avail = workers
         slurm_hosts_per_exe = []

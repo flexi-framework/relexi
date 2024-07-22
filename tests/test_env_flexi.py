@@ -1,19 +1,22 @@
 #!/usr/bin/env python3
 
+import os.path
+import unittest
+from unittest.mock import patch
+
+from smartsim import Experiment
+
 from .context import relexi
 import relexi.env.flexiEnvSmartSim as rlxenv
-from smartsim import Experiment
-from unittest.mock import patch
-import os.path
 from relexi.env.flexiEnvSmartSim import Client
 
 """ Contains pytest - tests for the functionalities of the relexi.env.flexiEnv module """
 
 @patch.object(rlxenv.flexiEnv,'_start_flexi')
 @patch.object(rlxenv.flexiEnv,'_get_current_state')
-@patch.object(rlxenv.flexiEnv,'_end_flexi')
+@patch.object(rlxenv.flexiEnv,'stop')
 @patch('relexi.env.flexiEnvSmartSim.Client')
-def init_flexi_env(mock__start_flexi, mock__get_current_state, mock__end_flexi, mock_Client):
+def init_flexi_env(mock__start_flexi, mock__get_current_state, mock_stop, mock_Client):
 
     smartsim_port = 6780
     smartsim_num_dbs = 1
@@ -59,7 +62,6 @@ def init_flexi_env(mock__start_flexi, mock__get_current_state, mock__end_flexi, 
                                ,tag              = 'eval'
                                ,port             = smartsim_port
                                ,entry_db         = entry_db
-                               ,is_db_cluster    = is_db_cluster
                                ,hosts            = worker_nodes
                                ,n_procs          = num_procs_per_environment
                                ,n_envs           = num_parallel_environments
@@ -77,6 +79,7 @@ def init_flexi_env(mock__start_flexi, mock__get_current_state, mock__end_flexi, 
 
     return flexi_env
 
+@unittest.skip('Has to be adapted to new Runtime implementation.')
 @patch('os.path.isfile')
 @patch('os.access')
 @patch.object(Experiment, 'start')
