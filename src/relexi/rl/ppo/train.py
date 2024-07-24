@@ -21,10 +21,10 @@ from tf_agents.replay_buffers import tf_uniform_replay_buffer
 import relexi.rl.models
 import relexi.rl.tf_helpers
 import relexi.env.flexiEnvSmartSim
-import relexi.smartsim.init_smartsim
+import relexi.runtime
 import relexi.io.readin as rlxin
 import relexi.io.output as rlxout
-from relexi.smartsim.helpers import generate_rankfile_ompi, copy_to_nodes, parser_flexi_parameters
+from relexi.runtime.helpers import copy_to_nodes, parser_flexi_parameters
 
 
 def train( config_file
@@ -62,9 +62,9 @@ def train( config_file
           ,do_profile  = False
           ,smartsim_port    = 6780
           ,smartsim_num_dbs = 1
-          ,smartsim_launcher = "local"
-          ,smartsim_orchestrator = "local"
-          ,env_launcher = "mpirun"
+          ,smartsim_orchestrator = 'local'
+          ,smartsim_network_interface = 'local'
+          ,env_launcher = 'mpirun'
           ,mpi_launch_mpmd = False
           ,local_dir = None
           ,n_procs_per_node=128 # Hawk
@@ -107,81 +107,55 @@ def train( config_file
         tf.config.optimizer.set_jit(True)
 
     # Initialize SmartSim
-    exp, worker_nodes, db, entry_db, is_db_cluster = relexi.smartsim.init_smartsim.init_smartsim(port = smartsim_port
-                                                                                                ,num_dbs = smartsim_num_dbs
-                                                                                                ,launcher_type = smartsim_launcher
-                                                                                                ,orchestrator_type = smartsim_orchestrator
-                                                                                                )
+    runtime = relexi.runtime.Runtime(
+                                    type_=smartsim_orchestrator,
+                                    db_port=smartsim_port,
+                                    db_network_interface=smartsim_network_interface,
+                                    )
+    runtime.info()
 
-    # generating rankfiles for OpenMPI
-    if mpi_launch_mpmd:
-        # If all MPI jobs are run with single mpirun command, all jobs are allocated based on single rankfile
-        rank_files = generate_rankfile_ompi(worker_nodes
-                                           ,n_procs_per_node
-                                           ,n_par_env=1
-                                           ,ranks_per_env=num_parallel_environments*num_procs_per_environment
-                                           )
+    ## Copy all local files into local directory, possibly fast RAM-Disk or similar
+    ## for performance and to reduce Filesystem access
+    #if local_dir:
+    #    # Prefix with PBS Job ID if PBS job
+    #    if smartsim_launcher.casefold() == 'pbs':
+    #        pbs_job_id = os.environ['PBS_JOBID']
+    #        local_dir = os.path.join(local_dir, pbs_job_id)
 
-    else:
-        # Otherwise every MPI job gets its own rankfile
-        rank_files = generate_rankfile_ompi(worker_nodes
-                                           ,n_procs_per_node
-                                           ,num_parallel_environments
-                                           ,num_procs_per_environment
-                                           )
+    #    rlxout.info(f"Moving local files to {local_dir} ..." )
 
-    # Copy all local files into local directory, possibly fast RAM-Disk or similar
-    # for performance and to reduce Filesystem access
-    if local_dir:
-        # Prefix with PBS Job ID if PBS job
-        if smartsim_launcher.casefold() == 'pbs':
-            pbs_job_id = os.environ['PBS_JOBID']
-            local_dir = os.path.join(local_dir, pbs_job_id)
+    #    # Get list of all nodes
+    #    nodes = copy.deepcopy(runtime.workers)
+    #    ai_node = os.environ['HOSTNAME']
+    #    nodes.insert(0, ai_node)
 
-        rlxout.info(f"Moving local files to {local_dir} ..." )
+    #    # Move all files to local dir
+    #    # TODO: control which files are copied by 'local_files' variable!
+    #    train_files          = copy_to_nodes(train_files,         local_dir,nodes,subfolder='train_files')
+    #    eval_files           = copy_to_nodes(eval_files,          local_dir,nodes,subfolder='eval_files')
+    #    reward_spectrum_file = copy_to_nodes(reward_spectrum_file,local_dir,nodes,subfolder='reward_files')
+    #    mesh_file            = copy_to_nodes(mesh_file,           local_dir,nodes,subfolder='meshf_file')
 
-        # Get list of all nodes
-        nodes = copy.deepcopy(worker_nodes)
-        ai_node = os.environ['HOSTNAME']
-        nodes.insert(0, ai_node)
+    #    # We have to update the meshfile in the parameter file before copying
+    #    parameter_file = parser_flexi_parameters(parameter_file, 'MeshFile', mesh_file)
+    #    parameter_file = copy_to_nodes(parameter_file,local_dir,nodes,subfolder='parameter_files')
 
-        # Move all files to local dir
-        # TODO: control which files are copied by 'local_files' variable!
-        train_files          = copy_to_nodes(train_files,         local_dir,nodes,subfolder='train_files')
-        eval_files           = copy_to_nodes(eval_files,          local_dir,nodes,subfolder='eval_files')
-        reward_spectrum_file = copy_to_nodes(reward_spectrum_file,local_dir,nodes,subfolder='reward_files')
-        rank_files           = copy_to_nodes(rank_files,          local_dir,nodes,subfolder='ompi_rank_files')
-        mesh_file            = copy_to_nodes(mesh_file,           local_dir,nodes,subfolder='ompi_rank_files')
-
-        # We have to update the meshfile in the parameter file before copying
-        parameter_file = parser_flexi_parameters(parameter_file, 'MeshFile', mesh_file)
-        parameter_file = copy_to_nodes(parameter_file,local_dir,nodes,subfolder='parameter_files')
-
-        rlxout.info(" DONE! ",newline=False)
-
-    if mpi_launch_mpmd:
-        rank_files = [rank_files[0] for _ in range(num_parallel_environments)]
+    #    rlxout.info(" DONE! ",newline=False)
 
 
     # Instantiate parallel collection environment
     my_env = tf_py_environment.TFPyEnvironment(
-             relexi.env.flexiEnvSmartSim.flexiEnv(exp
+             relexi.env.flexiEnvSmartSim.flexiEnv(runtime
                                                  ,executable_path
                                                  ,parameter_file
                                                  ,tag              = 'train'
-                                                 ,port             = smartsim_port
-                                                 ,entry_db         = entry_db
-                                                 ,is_db_cluster    = is_db_cluster
-                                                 ,hosts            = worker_nodes
                                                  ,n_envs           = num_parallel_environments
                                                  ,n_procs          = num_procs_per_environment
-                                                 ,n_procs_per_node = n_procs_per_node
                                                  ,spectra_file     = reward_spectrum_file
                                                  ,reward_kmin      = reward_kmin
                                                  ,reward_kmax      = reward_kmax
                                                  ,reward_scale     = reward_scale
                                                  ,restart_files    = train_files
-                                                 ,rankfiles        = rank_files
                                                  ,env_launcher     = env_launcher
                                                  ,mpi_launch_mpmd  = mpi_launch_mpmd
                                                  ,debug            = debug
@@ -193,23 +167,17 @@ def train( config_file
         eval_files = train_files
 
     my_eval_env = tf_py_environment.TFPyEnvironment(
-                  relexi.env.flexiEnvSmartSim.flexiEnv(exp
+                  relexi.env.flexiEnvSmartSim.flexiEnv(runtime
                                                       ,executable_path
                                                       ,parameter_file
                                                       ,tag              = 'eval'
-                                                      ,port             = smartsim_port
-                                                      ,entry_db         = entry_db
-                                                      ,is_db_cluster    = is_db_cluster
-                                                      ,hosts            = worker_nodes
                                                       ,n_procs          = num_procs_per_environment
-                                                      ,n_procs_per_node = n_procs_per_node
                                                       ,spectra_file     = reward_spectrum_file
                                                       ,reward_kmin      = reward_kmin
                                                       ,reward_kmax      = reward_kmax
                                                       ,reward_scale     = reward_scale
                                                       ,restart_files    = eval_files
                                                       ,random_restart_file = False
-                                                      ,rankfiles        = rank_files
                                                       ,env_launcher     = env_launcher
                                                       ,debug            = debug
                                                       ))
@@ -391,5 +359,5 @@ def train( config_file
     del my_env
     del my_eval_env
 
-    exp.stop(db)
+    del runtime
     time.sleep(2.) # Wait for orchestrator to be properly closed

@@ -20,7 +20,7 @@ def read_config(file_in, flatten=True):
     Returns:
         dict: Dictionary containing the contents of the file
     """
-    with open(file_in, 'r', encoding='ascii') as stream:
+    with open(file_in, 'r', encoding='utf-8') as stream:
         config = yaml.safe_load(stream)
 
     if flatten:
@@ -83,7 +83,7 @@ def read_file(filename, newline=None):
     Returns:
         str: Returns single string with the content of the file.
     """
-    with open(filename, 'r', encoding='ascii') as myfile:
+    with open(filename, 'r', encoding='utf-8') as myfile:
         data = myfile.read()
     if newline:
         return data.replace('\n', newline)
