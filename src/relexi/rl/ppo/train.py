@@ -62,9 +62,9 @@ def train( config_file
           ,do_profile  = False
           ,smartsim_port    = 6780
           ,smartsim_num_dbs = 1
-          ,smartsim_launcher = "local"
-          ,smartsim_orchestrator = "local"
-          ,env_launcher = "mpirun"
+          ,smartsim_orchestrator = 'local'
+          ,smartsim_network_interface = 'local'
+          ,env_launcher = 'mpirun'
           ,mpi_launch_mpmd = False
           ,local_dir = None
           ,n_procs_per_node=128 # Hawk
@@ -110,7 +110,7 @@ def train( config_file
     runtime = relexi.runtime.Runtime(
                                     type_=smartsim_orchestrator,
                                     db_port=smartsim_port,
-                                    db_network_interface='ibp94s0',
+                                    db_network_interface=smartsim_network_interface,
                                     )
     runtime.info()
 

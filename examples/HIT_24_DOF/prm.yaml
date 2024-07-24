@@ -14,8 +14,6 @@ environment:
   executable_path: ../../../flexi-extensions/build/bin/flexi
   parameter_file: ./simulation_files/parameter_flexi.ini
   mesh_file: ./simulation_files/CART_HEX_PERIODIC_004_mesh.h5
-  #local_dir: /var/tmp
-  mpi_launch_mpmd: False
   env_launcher: local
 
 # All parameters for setting up the reward
@@ -64,6 +62,5 @@ performance:
 # SmartSim
 smartsim:
   smartsim_port: 6780
-  smartsim_num_dbs: 1
-  smartsim_launcher: pbs
-  smartsim_orchestrator: pbs
+  smartsim_network_interface: local
+  smartsim_orchestrator: auto
