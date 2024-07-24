@@ -92,8 +92,8 @@ class Runtime():
             do_launch_orchestrator (bool, optional): Whether to launch the
                 `Orchestrator` immediately. Defaults to `True`.
         """
-        # Using SmartSim utility to identify type automatically
         try:
+            # Using SmartSim utility to identify type automatically
             if type_ == 'auto':
                 rlxout.info('Identifying environment...')
                 scheduler = smartsim.wlm.detect_launcher()
@@ -105,7 +105,7 @@ class Runtime():
             rlxout.info(f'Setting up "{self.type}" runtime...')
             self._hosts = self._get_hostlist()
             # Check that actually sufficient hosts found
-            if type_ != 'local' and len(self._hosts) < 2:
+            if self.type != 'local' and len(self._hosts) < 2:
                 raise ValueError('Less than 2 hosts found in environment!')
         except Exception as e:
             rlxout.warning(f'Failed: {e}')
