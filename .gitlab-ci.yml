@@ -19,6 +19,7 @@ default:
     - export GIT_CLONE_PROTECTION_ACTIVE=false
     - smart build --no_pt #--no_tf
   after_script:
+    - source venv/bin/activate
     - $(smart dbcli) -h 127.0.0.1 -p 6780 shutdown #Shutdown DB manually in any case, even if crashed
 
 variables: # Change pip's cache directory to be inside the project directory since we can only cache local items.
@@ -65,7 +66,7 @@ examples:
     - sed -i 's#\(executable_path:\).*#\1 ../../flexi-extensions/build/bin/flexi#' prm.yaml #Adapt path to FLEXI executable
     - sed -i 's#\(num_procs_per_environment:\).*#\1 2#' prm.yaml #Adapt number of proces to accelerate training
     - sed -i 's#\(env_launcher:\).*#\1 mpirun#' prm.yaml #Adapt launcher to MPI
-    - python3 ${CI_PROJECT_DIR}/src/relexi.py prm.yaml
+    - relexi prm.yaml
 
 # ----------------------------------------------------------------------------------------------------------------------------------------------------
 # Stage "deploy": Copies the repository to github
