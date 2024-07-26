@@ -2,7 +2,7 @@
 
 """Contains helper functions to harmonize the output to console."""
 
-STD_LENGTH = 72
+STD_LENGTH = 80
 """Standard length for output to console."""
 
 
@@ -26,27 +26,18 @@ def header(length=STD_LENGTH):
 
     Args:
         length (int): Number of characters used within each line.
-
-    TODO:
-        Make cool ASCII art.
     """
     print(Colors.BANNERA+'='*length)
-    print(Colors.BANNERA+'  ')
-    print(Colors.BANNERA +
-        " ooooooooo.             ooooo                  ooooooo  ooooo ooooo")
-    print(Colors.BANNERA +
-        " `888   `Y88.           `888'                   `8888    d8'  `888'")
-    print(Colors.BANNERA +
-        "  888   .d88'  .ooooo.   888          .ooooo.     Y888..8P     888 ")
-    print(Colors.BANNERA +
-        "  888ooo88P'  d88' `88b  888         d88' `88b     `8888'      888 ")
-    print(Colors.BANNERA +
-        "  888`88b.    888ooo888  888         888ooo888    .8PY888.     888 ")
-    print(Colors.BANNERA +
-        "  888  `88b.  888    .o  888       o 888    .o   d8'  `888b    888 ")
-    print(Colors.BANNERA +
-        " o888o  o888o `Y8bod8P' o888ooooood8 `Y8bod8P' o888o  o88888o o888o")
-    print(Colors.BANNERA+'  ')
+    print('')
+    print(Colors.BANNERA + " 000000000000    000000000000  000          000000000000  00000     00000  000")
+    print(Colors.BANNERA + " 0000000000000   000000000000  000          000000000000   00000   00000   000")
+    print(Colors.BANNERA + " 000        000  000           000          000              000000000     000")
+    print(Colors.BANNERA + " 000        000  000  0000000  000          000  0000000       00000       000")
+    print(Colors.BANNERA + " 000  00000000   000  0000000  000          000  0000000      0000000      000")
+    print(Colors.BANNERA + " 000  0000000    000           000          000              0000 0000     000")
+    print(Colors.BANNERA + " 000      0000   000000000000  00000000000  000000000000   00000   00000   000")
+    print(Colors.BANNERA + " 000       0000  000000000000  00000000000  000000000000  0000       0000  000")
+    print('')
     print(Colors.BANNERA+'='*length + Colors.END)
 
 

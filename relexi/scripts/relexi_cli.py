@@ -4,79 +4,62 @@
 
 import os
 import time
-import functools
 import argparse
 
-from tf_agents.system import multiprocessing
-
-from absl import app
-from absl import flags
-
+import relexi
 import relexi.io.output as rlxout
 import relexi.io.readin as rlxin
 import relexi.rl.ppo as rlxppo
 from relexi.rl.tf_helpers import init_gpus
 
 
-# All flags registered in argparse must also be registered here!
-FLAGS = flags.FLAGS
-flags.DEFINE_integer('d', 0,
-                     help='Sets level of debug output. 0: Standard, 1: also Debug Output, 2: also FLEXI output.',
-                     lower_bound=0, upper_bound=2)
-flags.DEFINE_integer('n', 1, 'Number of GPUs used', lower_bound=1)
-flags.DEFINE_boolean('h', False, 'Print help')
-flags.DEFINE_boolean('force-cpu', False, 'Forces TensorFlow to run on CPUs.')
-
-
 def parse_commandline_flags():
     """Parse commandline options with `argparse`.
 
-    This routines defines the commnadline arguments and parses themvia the
+    This routines defines the commnadline arguments and parses them via the
     `argparse` library.
 
     Return:
-        Returns dictionary with the parsed commandline arguments.
-
-    ATTENTION:
-        All flags registered in argparse must also be registered as flags to
-        abseil, since abseil parses the flags first, and aborts if some flag
-        is unknown.
-
-    TODO:
-        Fix double definition of flags in the future!
+        args: Parsed commandline arguments.
     """
     parser = argparse.ArgumentParser(
-        prog='python3 train.py',
-        description='A Reinforcement Learning Framework for FLEXI.'
+        prog='relexi',
+        description='Relexi: A reinforcement learning library for simulation environments on high-performance computing systems.'
     )
     parser.add_argument(
-        '--force-cpu',
-        default=False,
-        dest='force_cpu',
-        action='store_true',
-        help='Forces TensorFlow to run on CPUs.'
-    )
+            '-v',
+            '--version',
+            action='version',
+            version=f'%(prog)s {relexi.__version__}'
+            )
     parser.add_argument(
-        '-n',
-        metavar='N_GPU',
-        type=int,
-        default=1,
-        dest='num_gpus',
-        help='Number of GPUs used'
-    )
+            '--force-cpu',
+            default=False,
+            dest='force_cpu',
+            action='store_true',
+            help='Forces TensorFlow to run on CPUs.'
+            )
     parser.add_argument(
-        '-d',
-        metavar='DEBUG_LEVEL',
-        type=int,
-        default=0,
-        dest='debug',
-        help='Output level. 0: Standard, 1: also Debug Output, 2: also FLEXI output.'
-    )
+            '-n',
+            metavar='N_GPU',
+            type=int,
+            default=1,
+            dest='num_gpus',
+            help='Number of GPUs used'
+            )
     parser.add_argument(
-        'config_file',
-        type=str,
-        help='A configuration file in the YAML format.'
-    )
+            '-d',
+            metavar='DEBUG_LEVEL',
+            type=int,
+            default=0,
+            dest='debug',
+            help='Output level. 0: Standard, 1: also Debug Output, 2: also FLEXI output.'
+            )
+    parser.add_argument(
+            'config_file',
+            type=str,
+            help='A configuration file in the YAML format.'
+            )
 
     # Only parse known flags. Unknown flags are later parsed by abseil
     args = parser.parse_args()
@@ -84,15 +67,14 @@ def parse_commandline_flags():
     return args
 
 
-def main(argv):
+def main():
     """Parses arguments and starts training."""
-
-    # Print Header to Console
-    rlxout.header()
-
     start_time = time.time()
 
     args = parse_commandline_flags()
+
+    # Print Header to Console
+    rlxout.header()
 
     # Check if we should run on CPU or GPU
     if args.force_cpu:  # Force CPU execution
@@ -129,5 +111,4 @@ def main(argv):
 
 
 if __name__ == "__main__":
-    # Multiprocessing wrapper of main function from tf-agent
-    multiprocessing.handle_main(functools.partial(app.run, main))
+    main()

@@ -29,10 +29,6 @@ The main dependencies of Relexi are listed in the following with their supported
 | Package          | Version         | Note                                    |
 |:-----------------|----------------:|:----------------------------------------|
 | Python           |          ≥3.9   |                                         |
-| TensorFlow       |     2.9 - 2.15  |                                         |
-| TF-Agents        |          ≥0.13  |                                         |
-| SmartSim         |     0.4 - 0.6   |                                         |
-| SmartRedis       |          ≥0.4.1 |                                         |
 | CMake            |          ≥3.0   |                                         |
 | Make             |          ≥4.0   |                                         |
 | gcc-fortran      |          ≥9.4   | gcc 10 not supported! (gcc ≥11 is fine) |
@@ -46,20 +42,25 @@ Open a terminal and change into the directory where you want to install Relexi a
 It is highly recommended to use some form of virtual environment for the installation.
 You can use create and activate a new environment using `virtualenv` via
 ```bash
-python3 -m pip install virtualenv
-python3 -m virtualenv env_relexi
+pip install virtualenv
+virtualenv env_relexi
 source env_relexi/bin/activate
 ```
 
 ### Install Relexi
-Clone the Relexi repository and install the necessary dependencies with
+Relexi can be installed most simply with `pip` via
 ```bash
-git clone https://github.com/flexi-framework/relexi.git
-python3 -m pip install -r relexi/requirements.txt
+pip install relexi
 ```
 
-### Install SmartSim
-After installing the `smartsim` package via pip, it has to be installed with its dependencies via the `smart` commandline tool:
+Alternatively, it can be installed as editable package from the repository with
+```bash
+git clone https://github.com/flexi-framework/relexi.git
+pip install -e relexi/
+```
+
+### Build SmartSim
+After installing the `smartsim` package via pip, its database backend has to be installed with its dependencies via the `smart` commandline tool:
 ```bash
 smart clobber && smart clean
 smart build --no_pt
@@ -82,10 +83,10 @@ To enable MPI or to change the configuration of FLEXI, please see its [official 
 
 # Running the Code
 Relexi comes with some example setups to verify that it is correctly installed.
-Enter the directory of the first test case and run Relexi.
+Enter the directory of the first test case and run Relexi using its CLI.
 ```bash
 cd relexi/examples/HIT_24_DOF/
-python3 ../../src/relexi.py prm.yaml
+relexi prm.yaml
 ```
 The file ``prm.yaml`` contains the configuration for the reinforcement learning training.
 It can be adapted using the text editor of your choice.
