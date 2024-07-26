@@ -3,6 +3,7 @@
 [![license](https://img.shields.io/github/license/flexi-framework/relexi.svg?maxAge=2592000 "GPL-3.0 License")](LICENSE.md)
 [![doi](https://img.shields.io/badge/DOI-10.1016/j.simpa.2022.100422-blue "DOI")](https://doi.org/10.1016/j.simpa.2022.100422)
 [![docsbuild](https://github.com/flexi-framework/relexi/actions/workflows/docs.yml/badge.svg "Documentation")][relexi_docs]
+[![pypi](https://img.shields.io/pypi/v/relexi "PyPI")](https://pypi.org/project/relexi/)
 [![github](https://img.shields.io/badge/View%20on%20GitHub-%23121011.svg?logo=github&logoColor=white "GitHub")][relexi_github]
 
 # About Relexi
