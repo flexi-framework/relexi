@@ -1,0 +1,44 @@
+cff-version: 1.2.0
+message: "If you find Relexi helpful, please cite the project as follows:"
+
+title: Relexi
+version: 1.1.0
+authors:
+  - family-names: Kurz
+    given-names: Marius
+  - family-names: Offenhäuser
+    given-names: Philipp
+  - family-names: Beck
+    given-names: Andrea
+  - family-names: Viola
+    given-names: Dominic
+abstract: A scalable reinforcement learning framework for CFD on HPC systems.
+keywords:
+  - Reinforcement Learning
+  - High-Performance Computing
+  - Computational Fluid Dynamics
+license: GPL-3.0-or-later
+repository: https://github.com/flexi-framework/relexi
+
+preferred-citation:
+  type: article
+  title: "Relexi — A scalable open source reinforcement learning framework for high-performance computing"
+  authors:
+    - family-names: Kurz
+      given-names: Marius
+    - family-names: Offenhäuser
+      given-names: Philipp
+    - family-names: Viola
+      given-names: Dominic
+    - family-names: Resch
+      given-names: Michael
+    - family-names: Beck
+      given-names: Andrea
+  year: 2022
+  month: 09
+  journal: Software Impacts
+  volume: 14
+  pages: 100422
+  doi: 10.1016/j.simpa.2022.100422
+  url: https://doi.org/10.1016/j.simpa.2022.100422
+  notes: "Code available at: https://github.com/flexi-framework/relexi"
