@@ -2,7 +2,7 @@ cff-version: 1.2.0
 message: "If you find Relexi helpful, please cite the project as follows:"
 
 title: Relexi
-version: 1.1.0
+version: 2.0.0
 authors:
   - family-names: Kurz
     given-names: Marius
