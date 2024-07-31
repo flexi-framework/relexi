@@ -156,11 +156,14 @@ class Runtime():
         self.n_worker_slots = self._get_total_worker_slots()
 
     def __del__(self):
-        if self.db:
-            try:
-                self.exp.stop(self.db)
-            except Exception as e:
-                raise RuntimeError('Failed to stop the Orchestrator!') from e
+        self._teardown_orchestrator()
+
+    def __enter__(self):
+        """Context manager to enter the runtime environment."""
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self._teardown_orchestrator()
 
     def info(self):
         """Prints information about the current runtime environment."""
@@ -406,6 +409,14 @@ class Runtime():
         rlxout.info(f'$(smart dbcli) -h {db.hosts[0]} -p {port} shutdown', newline=False)
 
         return exp, db, f'{db_entry}:{port}'
+
+    def _teardown_orchestrator(self):
+        """Tear down the orchestrator."""
+        if self.db:
+            try:
+                self.exp.stop(self.db)
+            except Exception as e:
+                raise RuntimeError('Failed to stop the Orchestrator!') from e
 
 
     def _get_hostlist(self) -> List[str]:
