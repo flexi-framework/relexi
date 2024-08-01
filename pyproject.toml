@@ -36,6 +36,7 @@ smartredis = "*"
 tensorflow = ">=2.15,<2.16"
 tf-agents = "*"
 cmake = "3.*" # RedisAI incompatible with cmake 4.x
+scipy = "*"
 pyyaml = "*"
 matplotlib = "*"
 setuptools = "!=70.*" # Known bugs

@@ -1,0 +1,21 @@
+name: 'channel'
+description: 'Simple LES of a channel flow.'
+version: '1.0.0'
+repo_url: 'https://github.com/flexi-framework/flexi-extensions.git'
+exe_path: 'build/bin/flexi'
+git_tag: 'a38a6d1'
+cmake_flags:
+  - name: LIBS_USE_SMARTREDIS
+    value: 'ON'
+  - name: LIBS_USE_FFTW
+    value: 'ON'
+  - name: POSTI
+    value: 'OFF'
+  - name: FLEXI_TESTCASE
+    value: channel
+  - name: FLEXI_NODETYPE
+    value: GAUSS-LOBATTO
+  - name: FLEXI_SPLIT_DG
+    value: 'ON'
+  - name: FLEXI_EDDYVISCOSITY
+    value: 'ON'

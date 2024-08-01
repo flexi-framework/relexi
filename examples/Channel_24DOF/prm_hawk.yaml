@@ -1,0 +1,71 @@
+# YAML File
+
+# Project
+project:
+  run_name:     CHANNEL_004_UU_VV_WW_Scale_0p4_w_timeAvg_tend5
+  restart_dir:  null
+  random_seed:  124
+  log_interval: 1
+
+# All parameters for setting up the environment
+environment:
+  num_procs_per_environment: 16
+  num_parallel_environments: 4
+  num_episodes_per_iteration: 4
+  library_path: /zhome/academic/HLRS/iag/iagmkurz/code/flexi/flexi_smartsim/build/bin/flexi
+  parameter_file: ./parameter_flexi.ini
+
+# All parameters for setting up the reward
+reward:
+  reward_kmin: 3
+  reward_kmax: 9
+  reward_scale: 0.4
+  reward_spectrum_file: ./LM_Channel_0180_vel_fluc_prof.dat
+
+# All parameters regarding the training
+training:
+  train_num_epochs: 5
+  train_learning_rate: 1.e-4
+  train_num_iterations: 2000
+  train_buffer_capacity: 2000
+  train_files:
+    - ./Re180_turbulentChannel_State_0000009.000000000.h5
+    - ./Re180_turbulentChannel_State_0000009.500000000.h5
+    - ./Re180_turbulentChannel_State_0000010.000000000.h5
+    - ./Re180_turbulentChannel_State_0000010.500000000.h5
+    - ./Re180_turbulentChannel_State_0000011.000000000.h5
+    - ./Re180_turbulentChannel_State_0000011.500000000.h5
+    - ./Re180_turbulentChannel_State_0000012.000000000.h5
+    - ./Re180_turbulentChannel_State_0000012.500000000.h5
+    - ./Re180_turbulentChannel_State_0000013.000000000.h5
+
+# All parameters for the agent
+agent:
+  action_std: 0.02
+  discount_factor: 0.995
+  entropy_regularization: 0.0
+  importance_ratio_clipping: 0.2
+
+# Checkpointing
+checkpoint:
+  ckpt_interval: 10
+  ckpt_num:      1000
+
+# Evaluation
+evaluation:
+  eval_num_episodes: 1
+  eval_interval:     10
+  eval_files:
+    - ./Re180_turbulentChannel_State_0000015.000000000.h5
+
+# Performance
+performance:
+  use_XLA:    False
+  do_profile: False
+
+# SmartSim
+smartsim:
+  smartsim_port: 6780
+  smartsim_num_dbs: 1
+  smartsim_launcher: pbs
+  smartsim_orchestrator: pbs
