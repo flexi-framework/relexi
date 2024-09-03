@@ -71,6 +71,8 @@ def train( config_file
           ,entropy_regularization     = 0.0
           ,importance_ratio_clipping  = 0.2
           ,action_std        = 0.02
+          ,actor_type        = 'cnn_actor'
+          ,critic_type       = 'cnn_critic'
           ,dist_type         = 'normal'
           ,ckpt_interval     = 5
           ,ckpt_num          = 1000
@@ -114,7 +116,7 @@ def train( config_file
 
     # Set all output directories of the run accordingly
     train_dir = base_dir+"/train/"
-    eval_dir  = base_dir+"/eval/"
+    save_dir  = base_dir+"/models/"
     ckpt_dir  = base_dir+"/ckpt/"
 
     # Check if all necessary files actually exist
@@ -220,14 +222,16 @@ def train( config_file
             random.seed(random_seed)        # Python seed
             tf.random.set_seed(random_seed)  # TF seed
 
-        # Instantiate actor net
-        actor_net = relexi.rl.models.ActionNetCNN(my_env.observation_spec()
-                                                 ,my_env.action_spec()
-                                                 ,action_std=action_std
-                                                 ,dist_type=dist_type
-                                                 ,debug=debug)
-        value_net = relexi.rl.models.ValueNetCNN( my_env.observation_spec()
-                                                 ,debug=debug)
+        # Get required network architecture and instantiate
+        actor = relexi.rl.models.from_string(actor_type)
+        actor_net = actor(my_env.observation_spec()
+                         ,my_env.action_spec()
+                         ,action_std=action_std
+                         ,dist_type=dist_type
+                         ,debug=debug)
+        critic = relexi.rl.models.from_string(critic_type)
+        value_net = critic( my_env.observation_spec()
+                           ,debug=debug)
 
         # PPO Agent
         tf_agent = ppo_clip_agent.PPOClipAgent(
@@ -365,9 +369,10 @@ def train( config_file
 
             # Checkpoint the policy every ckpt_interval iterations
             if (i % ckpt_interval) == 0:
-                rlxout.info('Saving checkpoint to: ' + ckpt_dir)
+                rlxout.info('Saving checkpoint to: ' + ckpt_dir, newline=False)
                 train_checkpointer.save(global_step)
-                #tf_policy_saver.save(ckpt_dir)
+                rlxout.info('Saving current model to: ' + save_dir)
+                actor_net.model.save(os.path.join(save_dir,f'model_{global_step.numpy():06d}'))
 
             # Flush summary to TensorBoard
             tf.summary.flush()

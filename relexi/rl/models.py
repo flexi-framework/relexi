@@ -30,11 +30,50 @@ from tf_agents.networks import utils
 from tf_agents.utils import nest_utils
 
 
-def tanh_squash_to_spec(inputs, spec):
-    """Maps inputs with arbitrary range to range defined by spec using `tanh`."""
-    means = (spec.maximum + spec.minimum) / 2.0
-    magnitudes = (spec.maximum - spec.minimum) / 2.0
-    return means + magnitudes * tf.tanh(inputs)
+def get_models_list():
+    """Returns a list of the names of all implemented models.
+
+    Returns:
+        list: A list of classes with a `NAME` attribute.
+    """
+    # Filter globals to find classes with a NAME attribute
+    BASE = network.Network  # Base class for all models
+    return [
+        cls for cls in globals().values()
+        if isinstance(cls, type) and hasattr(cls, 'NAME') and issubclass(cls, BASE)
+    ]
+
+def get_models_dict():
+    """Returns a dictionary of all implemented models.
+
+    Returns:
+        dict: A dictionary with the class names as keys and the classes as values.
+    """
+    return {cls.NAME: cls for cls in get_models_list()}
+
+
+def from_string(name: str):
+    """Returns model class based on its name.
+
+    Args:
+        model (str): The name of the model class as a string.
+
+    Returns:
+        type: The class that matches the classname.
+
+    Raises:
+        ValueError: If no class with the given name is found.
+    """
+    # Get all implemented models
+    classes = get_models_dict()
+
+    # Iterate over the classes to find a match for the `NAME` attribute
+    for cls_name, cls in classes.items():
+        if getattr(cls, 'NAME') == name:
+            return cls
+
+    # If no matching class is found, raise an error
+    raise ValueError(f"No model found with name '{name} found'. Available models are: {classes}.")
 
 
 class ActionNetCNN(network.Network):
@@ -43,6 +82,10 @@ class ActionNetCNN(network.Network):
     ATTENTION: Might be incomparible for certain choices for the kernel size and
                the polyinomial degree N of FLEXI!
     """
+
+    NAME = 'cnn_actor'
+    """str: The name of the model class."""
+
     def __init__(self
                 ,input_tensor_spec
                 ,output_tensor_spec
@@ -61,7 +104,6 @@ class ActionNetCNN(network.Network):
         # Build model
         self.kernel=kernel
         self._buildmodel(kernel,dist_type,debug)
-
 
     def call(self, observations, step_type, network_state):
         del step_type
@@ -97,7 +139,6 @@ class ActionNetCNN(network.Network):
 
             # Build global distribution of independent elementwise Beta distributions. Only last dimension is sampling dimension
             return tfp.distributions.Independent(distribution=beta_distr,reinterpreted_batch_ndims=1), network_state
-
 
     def _buildmodel(self,kernel,dist_type,debug):
         input_shape = self._input_tensor_spec.shape
@@ -140,6 +181,12 @@ class ActionNetCNN(network.Network):
         self._model = tf.keras.Model(inputs=inputs, outputs=outputs, name='Actor_CNN')
         if debug > 0:
             self._model.summary()
+        self._model.save('test')
+
+    @property
+    def model(self):
+        """Returns the model."""
+        return self._model
 
 
 class ValueNetCNN(network.Network):
@@ -149,6 +196,9 @@ class ValueNetCNN(network.Network):
     ATTENTION: Might be incomparible for certain choices for the kernel size and
                the polyinomial degree N of FLEXI!
     """
+
+    NAME = 'cnn_critic'
+    """str: The name of the model class."""
 
     def __init__(self
                 ,input_tensor_spec
@@ -223,6 +273,11 @@ class ValueNetCNN(network.Network):
         if debug > 0:
             self._model.summary()
 
+    @property
+    def model(self):
+        """Returns the model."""
+        return self._model
+
 
 class ActionNetDG(network.Network):
     """
@@ -230,6 +285,9 @@ class ActionNetDG(network.Network):
     ensure that a network of this architecture can be applied to or trained on DG data of
     any polynomial degree. This allows to train a single DG-Net for a variety of N.
     """
+
+    NAME = 'dg_actor'
+    """str: The name of the model class."""
 
     def __init__(self
                 ,input_tensor_spec
@@ -291,6 +349,11 @@ class ActionNetDG(network.Network):
         if debug > 0:
             self._model.summary()
 
+    @property
+    def model(self):
+        """Returns the model."""
+        return self._model
+
 
 class ValueNetDG(network.Network):
     """
@@ -298,6 +361,10 @@ class ValueNetDG(network.Network):
     ensure that a network of this architecture can be applied to or trained on DG data of
     any polynomial degree. This allows to train a single DG-Net for a variety of N.
     """
+
+    NAME = 'dg_critic'
+    """str: The name of the model class."""
+
     def __init__(self, input_tensor_spec,kernel=3,debug=0):
         super(ValueNetDG, self).__init__(
             input_tensor_spec=input_tensor_spec,
@@ -348,3 +415,166 @@ class ValueNetDG(network.Network):
         self._model = tf.keras.Model(inputs=inputs, outputs=outputs, name='Value_DG')
         if debug > 0:
             self._model.summary()
+
+    @property
+    def model(self):
+        """Returns the model."""
+        return self._model
+
+
+class ActionNetMLP(network.Network):
+    """Fully-connected policy network architecture."""
+
+    NAME = 'mlp_actor'
+    """str: The name of the model class."""
+
+    def __init__(self
+                ,input_tensor_spec
+                ,output_tensor_spec
+                ,n_neurons=256
+                ,n_hidden_layers=2
+                ,action_std=0.02
+                ,dist_type='normal'
+                ,debug=0):
+        super().__init__(
+            input_tensor_spec = input_tensor_spec,
+            state_spec=(),
+            name='ActionNetMLP')
+        self._output_tensor_spec = output_tensor_spec
+        self._action_std = action_std
+        self._dist_type = dist_type
+
+        # Build model
+        self._n_neurons = n_neurons
+        self._n_hidden_layers = n_hidden_layers
+        self._model = self._buildmodel(debug)
+
+    def call(self, observations, step_type, network_state):
+        del step_type
+
+        # We use batch_squash here in case the observations have a time sequence compoment.
+        outer_rank = nest_utils.get_outer_rank(observations, self.input_tensor_spec)
+        batch_squash = utils.BatchSquash(outer_rank)
+        observations = tf.nest.map_structure(batch_squash.flatten, observations)
+
+        if self._dist_type=='normal':
+            # Evaluate model
+            action_means = self._model(observations)
+
+            # Unsquash in time
+            action_means = batch_squash.unflatten(action_means)
+
+            # Get standard deviation for actions
+            action_std = tf.ones_like(action_means)*self._action_std
+
+            # Return distribution
+            return tfp.distributions.MultivariateNormalDiag(action_means, action_std), network_state
+
+        elif self._dist_type=='beta':
+            # Evaluate model
+            beta_coeffs = self._model(observations)
+
+            # Split into arrays of `n` alpha & `n` beta values for a total for
+            # the `n`-dimensionsl prediction of the policy.
+            # (tf.identity copies the data to new tensor instead of referencing)
+            n = self._output_tensor_spec.shape[-1]  # Final output dimension of policy
+            beta_coeff1 = batch_squash.unflatten(tf.identity(beta_coeffs[:,0:  n]))
+            beta_coeff2 = batch_squash.unflatten(tf.identity(beta_coeffs[:,n:2*n]))
+
+            # Build scalar Beta Distributions
+            beta_distr = tfp.distributions.Beta(beta_coeff1,beta_coeff2,allow_nan_stats=False)
+
+            # Build global distribution of independent elementwise Beta distributions. Only last dimension is sampling dimension
+            return tfp.distributions.Independent(distribution=beta_distr,reinterpreted_batch_ndims=1), network_state
+
+    def _buildmodel(self, debug):
+        input_shape = self._input_tensor_spec.shape
+        n_actions = self._output_tensor_spec.shape[-1]
+        # Simple CNN
+        inputs  = tf.keras.Input(shape=input_shape)
+        x       = inputs
+        for i in range(self._n_hidden_layers):
+            x   = tf.keras.layers.Dense(self._n_neurons,activation='tanh')(x)
+
+        if self._dist_type=='normal':
+            outputs  = tf.keras.layers.Dense(n_actions,activation='sigmoid')(x)
+        elif self._dist_type=='beta':
+            bias_init = tf.keras.initializers.Constant(value=1.0)
+            x         = tf.keras.layers.Dense(2*n_actions,activation='softplus',bias_initializer=bias_init)(x)
+            outputs = tf.keras.layers.Lambda(lambda x: x+1.+tf.keras.backend.epsilon())(x)
+
+        # Create keras model
+        model = tf.keras.Model(inputs=inputs, outputs=outputs, name='Policy_MLP')
+        if debug > 0:
+            model.summary()
+        return model
+
+    @property
+    def model(self):
+        """Returns the model."""
+        return self._model
+
+
+class ValueNetMLP(network.Network):
+    """Fully-connected value network architecture."""
+
+    NAME = 'mlp_critic'
+    """str: The name of the model class."""
+
+    def __init__(self
+                ,input_tensor_spec
+                ,state_spec=()
+                ,n_neurons=256
+                ,n_hidden_layers=2
+                ,debug=0):
+        super().__init__(
+            input_tensor_spec = input_tensor_spec,
+            state_spec=(),
+            name='ValueNetMLP')
+        self._input_tensor_spec = input_tensor_spec
+
+        # Build model
+        self._n_neurons = n_neurons
+        self._n_hidden_layers = n_hidden_layers
+        self._model = self._buildmodel(debug)
+
+    def call(self, observations, step_type, network_state):
+        del step_type
+
+        # We use batch_squash here in case the observations have a time sequence compoment.
+        outer_rank = nest_utils.get_outer_rank(observations, self.input_tensor_spec)
+        batch_squash = utils.BatchSquash(outer_rank)
+        observations = tf.nest.map_structure(batch_squash.flatten, observations)
+
+        # Evaluate model
+        value = self._model(observations)
+
+        # Unsquash in time
+        value = batch_squash.unflatten(value)
+
+        # Remove last output dimension, which is of size [1] for the value net
+        # since the TF PPO agents seems to expect only a [batch x time] tensor.
+        value = tf.squeeze(value, axis=-1)
+
+        return value, network_state
+
+    def _buildmodel(self, debug):
+        input_shape = self._input_tensor_spec.shape
+
+        # Simple CNN
+        inputs  = tf.keras.Input(shape=input_shape)
+        x       = inputs
+        for i in range(self._n_hidden_layers):
+            x   = tf.keras.layers.Dense(self._n_neurons, activation='tanh')(x)
+        outputs = tf.keras.layers.Dense(1, activation='linear')(x)
+
+        # Create keras model
+        model = tf.keras.Model(inputs=inputs, outputs=outputs, name='Critic_MLP')
+        if debug > 0:
+            model.summary()
+        return model
+
+    @property
+    def model(self):
+        """Returns the model."""
+        return self._model
