@@ -42,13 +42,12 @@ from tf_agents.replay_buffers import tf_uniform_replay_buffer
 import relexi.rl.models
 import relexi.rl.tf_helpers
 import relexi.env.flexiEnvSmartSim
-import relexi.runtime
 import relexi.io.readin as rlxin
 import relexi.io.output as rlxout
-from relexi.runtime.helpers import copy_to_nodes, parser_flexi_parameters
 
 
 def train( config_file
+          ,runtime
           ,parameter_file
           ,executable_path
           ,train_files
@@ -79,20 +78,12 @@ def train( config_file
           ,eval_files        = None
           ,eval_num_episodes = 1
           ,eval_interval     = 5
-          ,eval_write_states = False
-          ,eval_do_analyze   = False
           ,use_XLA     = False
           ,do_profile  = False
-          ,smartsim_port    = 6780
-          ,smartsim_num_dbs = 1
-          ,smartsim_orchestrator = 'local'
-          ,smartsim_network_interface = 'local'
           ,env_launcher = 'mpirun'
           ,mpi_launch_mpmd = False
-          ,local_dir = None
-          ,n_procs_per_node=128 # Hawk
-          ,strategy=None
-          ,debug       = 0
+          ,strategy = None
+          ,debug = 0
         ):
     """
     Main training routine. Here, the (FLEXI) environment, the art. neural networks, the optimizer,...
@@ -128,43 +119,6 @@ def train( config_file
     if use_XLA:
         os.environ['TF_XLA_FLAGS'] = '--tf_xla_cpu_global_jit'
         tf.config.optimizer.set_jit(True)
-
-    # Initialize SmartSim
-    runtime = relexi.runtime.Runtime(
-                                    type_=smartsim_orchestrator,
-                                    db_port=smartsim_port,
-                                    db_network_interface=smartsim_network_interface,
-                                    )
-    runtime.info()
-
-    ## Copy all local files into local directory, possibly fast RAM-Disk or similar
-    ## for performance and to reduce Filesystem access
-    #if local_dir:
-    #    # Prefix with PBS Job ID if PBS job
-    #    if smartsim_launcher.casefold() == 'pbs':
-    #        pbs_job_id = os.environ['PBS_JOBID']
-    #        local_dir = os.path.join(local_dir, pbs_job_id)
-
-    #    rlxout.info(f"Moving local files to {local_dir} ..." )
-
-    #    # Get list of all nodes
-    #    nodes = copy.deepcopy(runtime.workers)
-    #    ai_node = os.environ['HOSTNAME']
-    #    nodes.insert(0, ai_node)
-
-    #    # Move all files to local dir
-    #    # TODO: control which files are copied by 'local_files' variable!
-    #    train_files          = copy_to_nodes(train_files,         local_dir,nodes,subfolder='train_files')
-    #    eval_files           = copy_to_nodes(eval_files,          local_dir,nodes,subfolder='eval_files')
-    #    reward_spectrum_file = copy_to_nodes(reward_spectrum_file,local_dir,nodes,subfolder='reward_files')
-    #    mesh_file            = copy_to_nodes(mesh_file,           local_dir,nodes,subfolder='meshf_file')
-
-    #    # We have to update the meshfile in the parameter file before copying
-    #    parameter_file = parser_flexi_parameters(parameter_file, 'MeshFile', mesh_file)
-    #    parameter_file = copy_to_nodes(parameter_file,local_dir,nodes,subfolder='parameter_files')
-
-    #    rlxout.info(" DONE! ",newline=False)
-
 
     # Instantiate parallel collection environment
     my_env = tf_py_environment.TFPyEnvironment(

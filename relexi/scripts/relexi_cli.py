@@ -119,13 +119,20 @@ def main():
     # Parse Config file
     config = rlxin.read_config(args.config_file)
 
-    # Start training the parameters of config (passed to the function as dict)
-    rlxppo.train(
-        debug=args.debug,
-        config_file=args.config_file,
-        **config,
-        strategy=strategy
-    )
+    with relexi.runtime.Runtime(
+            type_=config.get('smartsim_orchestrator', 'local'),
+            db_port=config.get('smartsim_port', 6739),
+            db_network_interface=config.get('smartsim_network_interface', 'local')
+            ) as runtime:
+        runtime.info()
+        # Start training the parameters of config (passed to the function as dict)
+        rlxppo.train(
+            runtime=runtime,
+            debug=args.debug,
+            config_file=args.config_file,
+            **config,
+            strategy=strategy
+        )
 
     # Provide final banner
     rlxout.banner(f'Sucessfully finished after: [{time.time()-start_time:8.2f}]s')
