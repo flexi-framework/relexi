@@ -90,9 +90,11 @@ documentation:
 
 github:
   stage: deploy
+  before_script: [] # Disable setting up Python environment
+  after_script: []  # Disable tearing down Python environment
   tags:
     - flexitag
-    - siegfried # Ensure GPU on system
+    - reggie # siegfried cannot push to GitHub
   rules:
     - if: '$DO_DEPLOY && $CI_SERVER_URL =~ /.*\.iag\.uni-stuttgart\.de$/'
   dependencies:
