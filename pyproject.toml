@@ -1,15 +1,15 @@
 [build-system]
-requires = ["poetry-core>=1.0.0"]
+requires = ["poetry-core>=1.2.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "relexi"
 version = "2.0.0"
 authors = [
-	"Marius Kurz <marius.kurz@cwi.nl>",
-	"Philipp Offenhäuser",
-	"Andrea Beck",
-	"Dominic Viola"
+    "Marius Kurz <marius.kurz@cwi.nl>",
+    "Philipp Offenhäuser",
+    "Andrea Beck",
+    "Dominic Viola"
 ]
 description = "A reinforcement learning library for simulation environments on high-performance computing systems."
 license = "GPL-3.0-or-later"
@@ -17,12 +17,17 @@ readme = "README.md"
 homepage = "https://flexi-framework.github.io/relexi/"
 repository = "https://github.com/flexi-framework/relexi/"
 documentation = "https://flexi-framework.github.io/relexi/"
-keywords = ["reinforcement learning", "machine learning", "high-performance computing", "simulation"]
+keywords = [
+    "reinforcement learning",
+    "machine learning",
+    "high-performance computing",
+    "simulation"
+]
 classifiers = [
     "Development Status :: 4 - Beta",
     "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Programming Language :: Python :: 3",
-    "Operating System :: OS Independent",
+    "Operating System :: OS Independent"
 ]
 
 [tool.poetry.dependencies]
@@ -34,11 +39,18 @@ cmake = "*"
 pyyaml = "*"
 matplotlib = "*"
 setuptools = "!=70.*" # Known bugs
-# Dev dependencies
-# TODO: Proper handling of dev-deps
-pdoc = "*"
-pytest = "*"
-pytest-cov = "*"
+
+# Add development dependencies as `dev` extra
+pdoc = { version = "*", optional = true }
+pytest = { version = "*", optional = true }
+pytest-cov = { version = "*", optional = true }
+
+[tool.poetry.extras]
+dev = [
+    "pdoc",
+    "pytest",
+    "pytest-cov"
+]
 
 [tool.poetry.scripts]
 relexi = "relexi.scripts.relexi_cli:main"

@@ -15,7 +15,7 @@ default:
     - pip install virtualenv
     - virtualenv venv
     - source venv/bin/activate
-    - python -m pip install .
+    - python -m pip install .[dev]
     - export GIT_CLONE_PROTECTION_ACTIVE=false
     - smart build --no_pt #--no_tf
   after_script:
