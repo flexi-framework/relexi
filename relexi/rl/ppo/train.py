@@ -319,7 +319,7 @@ def train( config_file
         start_time = time.time()
 
         # In case of restart don't start counting at 0
-        starting_iteration = int(global_step.numpy()/train_num_epochs)
+        starting_iteration = int(global_step.numpy()/train_num_epochs) + 1
 
         # Write parameter files to Tensorboard
         tf.summary.text("training_config"
@@ -329,25 +329,33 @@ def train( config_file
                        ,rlxin.read_file(parameter_file,newline='  \n') # TF uses markdown EOL
                        ,step=starting_iteration)
 
-        for i in range(starting_iteration ,train_num_iterations):
+        # Run initial evaluation
+        mytime = time.time()
+        relexi.rl.tf_helpers.collect_trajectories(eval_driver,my_eval_env)
+        # Log to console
+        rlxout.info(f'Initial eval time: [{time.time()-mytime:5.2f}s]')
+        rlxout.info(f'Initial eval return: {eval_avg_return.result().numpy():.6f}', newline=False)
+        # Only write to TB and checkpoint if starting from scratch to not overwrite previous data
+        if starting_iteration == 1:
+            # Write metrics and plot to Tensorboard
+            relexi.rl.tf_helpers.write_metrics(eval_metrics,global_step,'MetricsEval')
+            if my_eval_env.can_plot:
+                tf.summary.image("Environment", my_eval_env.plot(), step=global_step)
+            # Save
+            rlxout.info('Saving initial checkpoint to: ' + ckpt_dir)
+            train_checkpointer.save(global_step)
+            rlxout.info('Saving initial model to: ' + save_dir)
+            actor_net.model.save(os.path.join(save_dir,f'model_{0:06d}'))
 
-            if (i % eval_interval) == 0:
-                mytime = time.time()
-                relexi.rl.tf_helpers.collect_trajectories(eval_driver,my_eval_env)
-                relexi.rl.tf_helpers.write_metrics(eval_metrics,global_step,'MetricsEval')
-
-                # Plot Energy Spectra to Tensorboard
-                if my_eval_env.can_plot:
-                    tf.summary.image("Spectra", my_eval_env.plot(), step=global_step)
-
-                rlxout.info(f'Eval time: [{time.time()-mytime:5.2f}s]')
-                rlxout.info(f'Eval return: {eval_avg_return.result().numpy():.6f}', newline=False)
-
+        # Actual train loop
+        for i in range(starting_iteration ,train_num_iterations + 1):
+            # Collect trajectories, i.e. run simulations
             mytime = time.time()
             relexi.rl.tf_helpers.collect_trajectories(collect_driver,my_env)
             relexi.rl.tf_helpers.write_metrics(train_metrics,global_step,'MetricsTrain')
             collect_time = time.time()-mytime
 
+            # Train agent on collected trajectories
             mytime = time.time()
             if strategy:
                 relexi.rl.tf_helpers.train_agent_distributed(tf_agent,replay_buffer,strategy)
@@ -366,6 +374,18 @@ def train( config_file
                 rlxout.info(f'Sample time: [{collect_time:5.2f}s]')
                 rlxout.info(f'Train time:  [{train_time:5.2f}s]',newline=False)
                 rlxout.info(f'TOTAL:       [{total_time:5.2f}s]',newline=False)
+
+            # Run eval every eval_interval iterations
+            if (i % eval_interval) == 0:
+                mytime = time.time()
+                relexi.rl.tf_helpers.collect_trajectories(eval_driver,my_eval_env)
+                # Log to console
+                rlxout.info(f'Eval time: [{time.time()-mytime:5.2f}s]')
+                rlxout.info(f'Eval return: {eval_avg_return.result().numpy():.6f}', newline=False)
+                # Write metrics and plot to Tensorboard
+                relexi.rl.tf_helpers.write_metrics(eval_metrics,global_step,'MetricsEval')
+                if my_eval_env.can_plot:
+                    tf.summary.image("Environment", my_eval_env.plot(), step=global_step)
 
             # Checkpoint the policy every ckpt_interval iterations
             if (i % ckpt_interval) == 0:
