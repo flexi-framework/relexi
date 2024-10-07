@@ -84,6 +84,7 @@ def train( config_file
           ,mpi_launch_mpmd = False
           ,strategy = None
           ,debug = 0
+          ,**kwargs
         ):
     """
     Main training routine. Here, the (FLEXI) environment, the art. neural networks, the optimizer,...
@@ -343,9 +344,9 @@ def train( config_file
 
             # Checkpoint the policy every ckpt_interval iterations
             if (i % ckpt_interval) == 0:
-                rlxout.info('Saving checkpoint to: ' + ckpt_dir, newline=False)
+                rlxout.info('Saving checkpoint to: ' + ckpt_dir)
                 train_checkpointer.save(global_step)
-                rlxout.info('Saving current model to: ' + save_dir)
+                rlxout.info('Saving current model to: ' + save_dir, newline=False)
                 actor_net.model.save(os.path.join(save_dir,f'model_{global_step.numpy():06d}'))
 
             # Flush summary to TensorBoard
@@ -358,6 +359,3 @@ def train( config_file
     # Close all
     del my_env
     del my_eval_env
-
-    del runtime
-    time.sleep(2.) # Wait for orchestrator to be properly closed
