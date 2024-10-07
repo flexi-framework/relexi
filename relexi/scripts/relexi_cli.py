@@ -44,14 +44,20 @@ def parse_commandline_flags():
         args: Parsed commandline arguments.
     """
     parser = argparse.ArgumentParser(
-        prog='relexi',
-        description='Relexi: A reinforcement learning library for simulation environments on high-performance computing systems.'
-    )
+            prog='relexi',
+            description='Relexi: A reinforcement learning library for simulation environments on high-performance computing systems.'
+            )
     parser.add_argument(
             '-v',
             '--version',
             action='version',
             version=f'%(prog)s {relexi.__version__}'
+            )
+    parser.add_argument('--only-eval'
+            ,default=False
+            ,dest='only_eval'
+            ,action='store_true'
+            ,help='Only performs an evaluation of the current agent without training.'
             )
     parser.add_argument(
             '--force-cpu',
@@ -118,6 +124,14 @@ def main():
 
     # Parse Config file
     config = rlxin.read_config(args.config_file)
+
+    # Eval mode: only evaluate current agent without training
+    if args.only_eval:
+        rlxout.warning('Running in EVALUATION mode. Training will be skipped.')
+        # Skip training by setting number of iterations to 0
+        config['train_num_iterations'] = 0
+        # Minimize setup overhead of unnecessary training environment
+        config['num_parallel_environments'] = 1
 
     with relexi.runtime.Runtime(
             type_=config.get('smartsim_orchestrator', 'local'),
