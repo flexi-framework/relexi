@@ -41,7 +41,7 @@ from tf_agents.replay_buffers import tf_uniform_replay_buffer
 
 import relexi.rl.models
 import relexi.rl.tf_helpers
-import relexi.env.flexiEnvSmartSim
+import relexi.env
 import relexi.io.readin as rlxin
 import relexi.io.output as rlxout
 
@@ -56,7 +56,7 @@ def train( config_file
           ,reward_spectrum_file
           ,reward_scale
           ,reward_kmax
-          ,mesh_file
+          ,env_name = 'hit'
           ,reward_kmin  = 1
           ,run_name     = None # Output directory will be named accordingly
           ,restart_dir  = None # Directory with checkpoints to restart from
@@ -121,23 +121,26 @@ def train( config_file
         os.environ['TF_XLA_FLAGS'] = '--tf_xla_cpu_global_jit'
         tf.config.optimizer.set_jit(True)
 
+    # Load environment
+    env_class = relexi.env.load_environment(env_name)
+
     # Instantiate parallel collection environment
     my_env = tf_py_environment.TFPyEnvironment(
-             relexi.env.flexiEnvSmartSim.flexiEnv(runtime
-                                                 ,executable_path
-                                                 ,parameter_file
-                                                 ,tag              = 'train'
-                                                 ,n_envs           = num_parallel_environments
-                                                 ,n_procs          = num_procs_per_environment
-                                                 ,spectra_file     = reward_spectrum_file
-                                                 ,reward_kmin      = reward_kmin
-                                                 ,reward_kmax      = reward_kmax
-                                                 ,reward_scale     = reward_scale
-                                                 ,restart_files    = train_files
-                                                 ,env_launcher     = env_launcher
-                                                 ,mpi_launch_mpmd  = mpi_launch_mpmd
-                                                 ,debug            = debug
-                                                 ))
+             env_class(runtime
+                       ,executable_path
+                       ,parameter_file
+                       ,tag              = 'train'
+                       ,n_envs           = num_parallel_environments
+                       ,n_procs          = num_procs_per_environment
+                       ,spectra_file     = reward_spectrum_file
+                       ,reward_kmin      = reward_kmin
+                       ,reward_kmax      = reward_kmax
+                       ,reward_scale     = reward_scale
+                       ,restart_files    = train_files
+                       ,env_launcher     = env_launcher
+                       ,mpi_launch_mpmd  = mpi_launch_mpmd
+                       ,debug            = debug
+                       ))
 
     # Instantiate serial evaluation environment
     if eval_files is None:
@@ -145,21 +148,20 @@ def train( config_file
         eval_files = train_files
 
     my_eval_env = tf_py_environment.TFPyEnvironment(
-                  relexi.env.flexiEnvSmartSim.flexiEnv(runtime
-                                                      ,executable_path
-                                                      ,parameter_file
-                                                      ,tag              = 'eval'
-                                                      ,n_procs          = num_procs_per_environment
-                                                      ,spectra_file     = reward_spectrum_file
-                                                      ,reward_kmin      = reward_kmin
-                                                      ,reward_kmax      = reward_kmax
-                                                      ,reward_scale     = reward_scale
-                                                      ,restart_files    = eval_files
-                                                      ,random_restart_file = False
-                                                      ,env_launcher     = env_launcher
-                                                      ,debug            = debug
-                                                      ))
-
+                  env_class(runtime
+                            ,executable_path
+                            ,parameter_file
+                            ,tag              = 'eval'
+                            ,n_procs          = num_procs_per_environment
+                            ,spectra_file     = reward_spectrum_file
+                            ,reward_kmin      = reward_kmin
+                            ,reward_kmax      = reward_kmax
+                            ,reward_scale     = reward_scale
+                            ,restart_files    = eval_files
+                            ,random_restart_file = False
+                            ,env_launcher     = env_launcher
+                            ,debug            = debug
+                            ))
 
     # Get training variables
     optimizer   = tf.keras.optimizers.Adam(learning_rate=train_learning_rate)

@@ -9,11 +9,11 @@ project:
 
 # All parameters for setting up the environment
 environment:
+  env_name: hit
   num_procs_per_environment:  1
   num_parallel_environments:  2
   executable_path: ../../../flexi-extensions/build/bin/flexi
   parameter_file: ./simulation_files/parameter_flexi.ini
-  mesh_file: ./simulation_files/CART_HEX_PERIODIC_004_mesh.h5
   env_launcher: local
 
 # All parameters for setting up the reward
