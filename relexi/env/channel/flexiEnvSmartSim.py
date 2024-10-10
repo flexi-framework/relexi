@@ -291,7 +291,7 @@ class flexiEnv(py_environment.PyEnvironment):
         do_init = True
         key = "state"
         for tag in self.tag:
-            self.client.poll_tensor(tag+key, 10, 1000)
+            self.client.poll_tensor(tag+key, 10, 10000)
             try:
                 data = self.client.get_tensor(tag+key)
             except Exception:
@@ -327,25 +327,6 @@ class flexiEnv(py_environment.PyEnvironment):
             else:
                 has_ended[i] = True
         return np.all(has_ended)
-
-    #def _get_reward(self):
-    #  """Compute the reward for the agent, based on the current flow state."""
-    #  reward     = np.zeros( (self.n_envs,) )
-    #  self.E_LES = np.zeros( (self.n_envs,self.reward_kmax) )
-    #  for i in range(self.n_envs):
-    #    # Poll Tensor
-    #    self.client.poll_tensor(self.tag[i]+"Ekin",10,1000)
-    #    data = self.client.get_tensor(self.tag[i]+"Ekin")
-    #    self.client.delete_tensor(self.tag[i]+"Ekin")
-    #    self.E_LES[i,:] = data[0:self.reward_kmax]
-
-    #    # Compute Reward
-    #    error  = self.E_LES[i,self.reward_kmin-1:self.reward_kmax] - self.E_DNS[self.reward_kmin-1:self.reward_kmax]
-    #    error  = error/self.E_DNS[self.reward_kmin-1:self.reward_kmax]
-    #    error  = np.square(error)
-    #    reward[i] = 2.*np.exp(-1.*np.mean(error)/self.reward_scale)-1.
-    #
-    #  return reward
 
     def _get_reward(self):
         """Compute the reward for the agent, based on the current flow state."""
@@ -465,15 +446,15 @@ class flexiEnv(py_environment.PyEnvironment):
 
         # Plot Spectra
         fig = plt.figure(figsize=(8,5))
-        plt.plot(RS_DNS[  0,:]+1.,RS_DNS[  1,:], label='DNS uu',    linestyle='--',color='g',LineWidth=2)
-        plt.plot(RS_DNS[  0,:]+1.,RS_DNS[  2,:], label='DNS vv',    linestyle='--',color='r',LineWidth=2)
-        plt.plot(RS_DNS[  0,:]+1.,RS_DNS[  3,:], label='DNS ww',    linestyle='--',color='b',LineWidth=2)
-        plt.plot(RS_DNS[  0,:]+1.,RS_DNS[  4,:], label='DNS uv',    linestyle='--',color='k',LineWidth=2)
-        plt.plot(RS_LES[0,0,:]+1.,RS_LES[0,1,:], label='LES U_mean',linestyle='-' ,color='g',LineWidth=2)
-        plt.plot(RS_LES[0,0,:]+1.,RS_LES[0,2,:], label='LES uu',    linestyle='-' ,color='g',LineWidth=2)
-        plt.plot(RS_LES[0,0,:]+1.,RS_LES[0,3,:], label='LES vv',    linestyle='-' ,color='r',LineWidth=2)
-        plt.plot(RS_LES[0,0,:]+1.,RS_LES[0,4,:], label='LES ww',    linestyle='-' ,color='b',LineWidth=2)
-        plt.plot(RS_LES[0,0,:]+1.,RS_LES[0,5,:], label='LES uv',    linestyle='-' ,color='k',LineWidth=2)
+        plt.plot(RS_DNS[  0,:]+1.,RS_DNS[  1,:], label='DNS uu',    linestyle='--',color='g',linewidth=2)
+        plt.plot(RS_DNS[  0,:]+1.,RS_DNS[  2,:], label='DNS vv',    linestyle='--',color='r',linewidth=2)
+        plt.plot(RS_DNS[  0,:]+1.,RS_DNS[  3,:], label='DNS ww',    linestyle='--',color='b',linewidth=2)
+        plt.plot(RS_DNS[  0,:]+1.,RS_DNS[  4,:], label='DNS uv',    linestyle='--',color='k',linewidth=2)
+        plt.plot(RS_LES[0,0,:]+1.,RS_LES[0,1,:], label='LES U_mean',linestyle='-' ,color='g',linewidth=2)
+        plt.plot(RS_LES[0,0,:]+1.,RS_LES[0,2,:], label='LES uu',    linestyle='-' ,color='g',linewidth=2)
+        plt.plot(RS_LES[0,0,:]+1.,RS_LES[0,3,:], label='LES vv',    linestyle='-' ,color='r',linewidth=2)
+        plt.plot(RS_LES[0,0,:]+1.,RS_LES[0,4,:], label='LES ww',    linestyle='-' ,color='b',linewidth=2)
+        plt.plot(RS_LES[0,0,:]+1.,RS_LES[0,5,:], label='LES uv',    linestyle='-' ,color='k',linewidth=2)
 
         plt.xlabel('y', fontsize=21)
         plt.ylabel('RS',fontsize=21)

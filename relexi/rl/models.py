@@ -191,7 +191,6 @@ class ActionNetCNN(network.Network):
         self._model = tf.keras.Model(inputs=inputs, outputs=outputs, name='Actor_CNN')
         if debug > 0:
             self._model.summary()
-        self._model.save('test')
 
     @property
     def model(self):
