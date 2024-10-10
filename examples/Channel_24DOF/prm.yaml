@@ -2,25 +2,27 @@
 
 # Project
 project:
-  run_name:     Channel_Re180
+  run_name:     Channel_Re180_Ma0p3
   restart_dir:  null
   random_seed:  124
   log_interval: 1
 
 # All parameters for setting up the environment
 environment:
-  num_procs_per_environment:  2
+  env_name: 'channel'
+  num_procs_per_environment:  4
   num_parallel_environments:  1
-  executable_path: ../../.environments/channel/build/bin/flexi
-  parameter_file: ./simulation_files/parameter_flexi.ini
-  env_launcher: local
+  executable_path: ../../../flexi/flexi_dev/build_channel/bin/flexi
+  parameter_file: ./simulation_files/Re180_Ma0.3/parameter_flexi.ini
+  env_launcher: mpirun
 
 # All parameters for setting up the reward
 reward:
   reward_kmin: 1
   reward_kmax: 9
   reward_scale: 0.4
-  reward_spectrum_file: ./simulation_files/LM_Channel_0180_vel_fluc_prof.dat
+    #reward_spectrum_file: ./simulation_files/LM_Channel_0180_vel_fluc_prof.dat
+  reward_spectrum_file: ./simulation_files/LM_Channel_0180_mean_prof.dat
 
 # All parameters regarding the training
 training:
@@ -29,9 +31,9 @@ training:
   train_num_iterations: 1
   train_buffer_capacity: 2000
   train_files:
-    - ./simulation_files/Re180_turbulentChannel_State_0000012.000000000.h5
-    - ./simulation_files/Re180_turbulentChannel_State_0000013.000000000.h5
-    - ./simulation_files/Re180_turbulentChannel_State_0000014.000000000.h5
+    - ./simulation_files/Re180_Ma0.3/Re180_turbulentChannel_Ma0p3_State_0000011.000000000.h5
+    - ./simulation_files/Re180_Ma0.3/Re180_turbulentChannel_Ma0p3_State_0000012.000000000.h5
+    - ./simulation_files/Re180_Ma0.3/Re180_turbulentChannel_Ma0p3_State_0000013.000000000.h5
 
 # All parameters for the agent
 agent:
@@ -51,7 +53,7 @@ evaluation:
   eval_num_episodes: 1
   eval_interval:     5
   eval_files:
-    - ./simulation_files/Re180_turbulentChannel_State_0000014.000000000.h5
+    - ./simulation_files/Re180_Ma0.3/Re180_turbulentChannel_Ma0p3_State_0000015.000000000.h5
 
 # Performance
 performance:
