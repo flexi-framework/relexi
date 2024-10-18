@@ -57,11 +57,24 @@ class flexiEnv(py_environment.PyEnvironment):
             environments can be subclassed.
     """
 
-    REWARD_COL_Y  = 0
-    REWARD_COL_UU = 2
-    REWARD_COL_VV = 3
-    REWARD_COL_WW = 4
-    REWARD_COL_UV = 5
+    RS_COL_Y  = 0
+    RS_COL_YP = 1
+    RS_COL_UU = 2
+    RS_COL_VV = 3
+    RS_COL_WW = 4
+    RS_COL_UV = 5
+    """Column indices of the DNS statistics file"""
+
+    FLEXI_COL_Y = 0
+    FLEXI_COL_U_MEAN = 1
+    FLEXI_COL_V_MEAN = 2
+    FLEXI_COL_W_MEAN = 3
+    FLEXI_COL_UU = 4
+    FLEXI_COL_VV = 5
+    FLEXI_COL_WW = 6
+    FLEXI_COL_UV = 7
+    """Column indices for the data sent by FLEXI"""
+
 
     def __init__(self,
                  runtime,
@@ -331,27 +344,47 @@ class flexiEnv(py_environment.PyEnvironment):
     def _get_reward(self):
         """Compute the reward for the agent, based on the current flow state."""
         reward = np.zeros((self.n_envs,))
+
+        # Select type of reward to be computed
+        TYPE = 3
+        if TYPE == 1:
+            # 1. Reward only on U_mean (Use U_mean Moser data as spectra_file!)
+            LES_COL = [self.FLEXI_COL_U_MEAN]
+            DNS_COL = [self.RS_COL_UU]
+        elif TYPE == 2:
+            # 2. Reward only on U'U' Fluctuations
+            LES_COL = [self.FLEXI_COL_UU]
+            DNS_COL = [self.RS_COL_UU]
+        elif TYPE == 3:
+            # 3. Reward on 3 diagonal Fluctuations (U'U',V'V',W'W')
+            LES_COL = [self.FLEXI_COL_UU, self.FLEXI_COL_VV, self.FLEXI_COL_WW]
+            DNS_COL = [self.RS_COL_UU, self.RS_COL_VV, self.RS_COL_WW]
+        elif TYPE == 4:
+            # 4. Reward on all 4 Fluctuations (U'U',V'V',W'W',U'V')
+            LES_COL = [self.FLEXI_COL_UU, self.FLEXI_COL_VV,
+                       self.FLEXI_COL_WW, self.FLEXI_COL_UV]
+            DNS_COL = [self.RS_COL_UU, self.RS_COL_VV,
+                       self.RS_COL_WW, self.RS_COL_UV]
+
         key = "Ekin"
         for i in range(self.n_envs):
             # Poll Tensor Ordering: (y,U_mean,U'U',V'V',W'W',U'V')
-            self.client.poll_tensor(self.tag[i]+key, 10, 1000)
-            data = self.client.get_tensor(self.tag[i]+key)
-            self.client.delete_tensor(self.tag[i]+key)
+            self.client.poll_tensor(self.tag[i] + key, 10, 1000)
+            data = self.client.get_tensor(self.tag[i] + key)
+            self.client.delete_tensor(self.tag[i] + key)
             # Interpolate DNS to LES points
-            RS_DNS2LES = self._interpolate_DNS_to_LES(self.RS_DNS,data)
+            RS_DNS2LES = self._interpolate_DNS_to_LES(self.RS_DNS, data)
             # Append Reynolds Stresses
             if i == 0:
-                self.RS_LES = np.expand_dims(data,axis=0)
+                self.RS_LES = np.expand_dims(data, axis=0)
             else:
                 self.RS_LES = np.append(self.RS_LES, np.expand_dims(data, axis=0), axis=0)
-            # Compute Reward
-            # 1. Reward only on U_mean (Use U_mean Moser data as spectra_file!)
-            error  = (self.RS_LES[i,1,:] - RS_DNS2LES[0,:]) / RS_DNS2LES[0,:]
-            # 2. Reward only on U'U' Fluctuations
-            #error  = (self.RS_LES[i,2,:] - RS_DNS2LES[0,:]) / RS_DNS2LES[1,:]
-            # 3. Reward on all 4 Fluctuations (U'U',V'V',W'W',U'V')
-            #error  = (self.RS_LES[i,2:,:] - RS_DNS2LES[0:,:]) / RS_DNS2LES[:,:]
-            if np.linalg.norm(data[1:,:]) < 1.e-4:
+
+            error  = self.RS_LES[i, LES_COL, :] - RS_DNS2LES[DNS_COL, :]
+            error /= RS_DNS2LES[DNS_COL, :]
+
+            # Check if data was sent. If not, reward is sparse, hence set to 0
+            if np.linalg.norm(self.RS_LES[i,LES_COL, :]) < 1.e-4:
                 reward[i] = 0.
             else:
                 reward[i] = 2.*np.exp(-1.*np.mean(np.square(error))/self.reward_scale)-1.
@@ -377,7 +410,7 @@ class flexiEnv(py_environment.PyEnvironment):
 
     def _interpolate_DNS_to_LES(self,RS_DNS,RS_LES):
         """Linear interpolation of DNS data points to the LES grid with the help of scipy"""
-        f = scipy.interpolate.interp1d(RS_DNS[0],RS_DNS[1:])
+        f = scipy.interpolate.interp1d(RS_DNS[0],RS_DNS[:])
         return f(RS_LES[0,:])
 
     def _read_reynolds_stresses(self,rs_file):
@@ -395,12 +428,13 @@ class flexiEnv(py_environment.PyEnvironment):
                     continue
 
                 # Build list of target statistics [y,u'u',v'v',w'w',u'v']
-                mylist = [float(i) for i in line[0:] if i != '']
-                mylist = [mylist[self.REWARD_COL_Y ],
-                          mylist[self.REWARD_COL_UU],
-                          mylist[self.REWARD_COL_VV],
-                          mylist[self.REWARD_COL_WW],
-                          mylist[self.REWARD_COL_UV]]
+                mylist = [float(i) for i in line[:] if i != '']
+                mylist = [mylist[self.RS_COL_Y ],
+                          mylist[self.RS_COL_YP],
+                          mylist[self.RS_COL_UU],
+                          mylist[self.RS_COL_VV],
+                          mylist[self.RS_COL_WW],
+                          mylist[self.RS_COL_UV]]
                 # End append data
                 if first:
                     data = np.zeros((len(mylist),1))
@@ -408,7 +442,7 @@ class flexiEnv(py_environment.PyEnvironment):
                     first=False
                 else:
                     data = np.append(data,np.expand_dims(np.asarray(mylist),axis=1),axis=1)
-                data[self.REWARD_COL_Y,-1] -= 1. # Map y coordinate from [0,1] to [-1,0]
+                data[self.RS_COL_Y,-1] -= 1. # Map y coordinate from [0,1] to [-1,0]
 
         return data
 
