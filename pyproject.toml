@@ -40,6 +40,9 @@ pyyaml = "*"
 matplotlib = "*"
 setuptools = "!=70.*" # Known bugs
 
+# Add optional dependencies for graph neural networks
+gcnn = { git = "https://github.com/m-kurz/gcnn.git", branch = "main", optional = true }
+
 # Add development dependencies as `dev` extra
 pdoc = { version = "*", optional = true }
 pytest = { version = "*", optional = true }
@@ -50,6 +53,9 @@ dev = [
     "pdoc",
     "pytest",
     "pytest-cov"
+]
+gnn = [
+    "gcnn"
 ]
 
 [tool.poetry.scripts]

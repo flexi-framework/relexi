@@ -29,6 +29,13 @@ from tf_agents.networks import network
 from tf_agents.networks import utils
 from tf_agents.utils import nest_utils
 
+try:
+    import gcnn.layers
+    import gcnn.utils
+    GCNN_AVAILABLE = True
+except ImportError:
+    GCNN_AVAILABLE = False
+
 
 def get_models_list():
     """Returns a list of the names of all implemented models.
@@ -73,7 +80,10 @@ def from_string(name: str):
             return cls
 
     # If no matching class is found, raise an error
-    raise ValueError(f"No model found with name '{name} found'. Available models are: {classes}.")
+    my_str = f"No model found with name '{name}'. Available models are:\n"
+    for key in classes.keys():
+        my_str += f"- {key}\n"
+    raise ValueError(my_str)
 
 
 class ActionNetCNN(network.Network):
@@ -578,3 +588,203 @@ class ValueNetMLP(network.Network):
     def model(self):
         """Returns the model."""
         return self._model
+
+
+if GCNN_AVAILABLE:
+    """Only import GCNN models if the optional GCNN package is installed."""
+
+    class ActionNetGCN(network.Network):
+        """Policy network architecture based on Graph Convolutions."""
+
+        NAME = 'gcn_actor'
+        """str: The name of the model class."""
+
+        def __init__(self
+                    ,input_tensor_spec
+                    ,output_tensor_spec
+                    ,action_std=0.02
+                    ,latent_dim=32
+                    ,n_message_passing=2
+                    ,dist_type='normal'
+                    ,debug=0):
+            super(ActionNetGCN, self).__init__(
+                input_tensor_spec = input_tensor_spec,
+                state_spec=(),
+                name='ActionNetGCN')
+            self._output_tensor_spec = output_tensor_spec
+            self._action_std = action_std
+            self._dist_type = dist_type
+
+            # Build model
+            self.latent_dim = latent_dim
+            self._buildmodel(n_message_passing, dist_type, debug)
+
+        def call(self, observations, step_type, network_state):
+            del step_type
+
+            # We use batch_squash here in case the observations have a time sequence compoment.
+            outer_rank = nest_utils.get_outer_rank(observations, self.input_tensor_spec)
+            batch_squash = utils.BatchSquash(outer_rank)
+            observations = tf.nest.map_structure(batch_squash.flatten, observations)
+
+            if self._dist_type=='normal':
+                # Evaluate model
+                action_means = self._model(observations)
+
+                # Unsquash in time
+                action_means = batch_squash.unflatten(action_means)
+
+                # Get standard deviation for actions
+                action_std = tf.ones_like(action_means)*self._action_std
+
+                # Return distribution
+                return tfp.distributions.MultivariateNormalDiag(action_means, action_std), network_state
+
+            elif self._dist_type=='beta':
+                # Evaluate model
+                beta_coeffs = self._model(observations)
+
+                # Get arrays of alpha & beta values (tf.identity copies the data to new tensor instead of referencing)
+                beta_coeff1 = batch_squash.unflatten(tf.identity(beta_coeffs[:,:,0]))
+                beta_coeff2 = batch_squash.unflatten(tf.identity(beta_coeffs[:,:,1]))
+
+                # Build scalar Beta Distributions
+                beta_distr = tfp.distributions.Beta(beta_coeff1,beta_coeff2,allow_nan_stats=False)
+
+                # Build global distribution of independent elementwise Beta distributions. Only last dimension is sampling dimension
+                return tfp.distributions.Independent(distribution=beta_distr,reinterpreted_batch_ndims=1), network_state
+
+        def _buildmodel(self, n_message_passing, dist_type, debug):
+            input_shape = self._input_tensor_spec.shape
+            Np1 = input_shape[-2]
+
+            # New Shape (..., None, Np1, Np1, Np1, nVar) -> (..., None, Np1*Np1*Np1, nVar)
+            flatten_shape = (input_shape[:-4]+(np.power(Np1,3),)+(input_shape[-1],))
+
+            A = gcnn.utils.GridGraph.get_adjacency_matrix((Np1,Np1,Np1))
+
+            # Simple GCN with Encoder and Decoder
+            inputs = tf.keras.Input(shape=input_shape)
+            x = tf.keras.layers.Reshape(flatten_shape)(inputs)
+
+            # Encoder
+            x = tf.keras.layers.Dense(             16, activation='relu', kernel_initializer='he_uniform')(x)
+            x = tf.keras.layers.Dense(self.latent_dim, activation='relu', kernel_initializer='he_uniform')(x)
+
+            # n rounds of GCN-style message passing
+            for _ in range(n_message_passing):
+                x = gcnn.layers.GraphConv(self.latent_dim, A, kernel_initializer = 'he_uniform', sparse_op = False)(x)
+                x = tf.keras.layers.Activation('relu')(x)
+
+            # Readout layer
+            x = gcnn.layers.GraphReadout(reduction_op='mean', reduction_dim=-2)(x)
+
+            # Decoder
+            x = tf.keras.layers.Dense(16, activation='relu', kernel_initializer='he_uniform')(x)
+            if dist_type == 'normal':
+                x       = tf.keras.layers.Dense(1, activation= 'sigmoid', kernel_initializer='he_uniform')(x)
+                #x       = tf.keras.layers.Lambda(lambda x: x*0.5)(x)
+                outputs = tf.keras.layers.Flatten()(x)
+
+            elif dist_type == 'beta':
+                # Filter size of last conv layer defines the number of output parameters
+                bias_init = tf.keras.initializers.Constant(value=1.0)
+                x         = tf.keras.layers.Dense(2, activation='softplus',kernel_initializer='he_uniform',bias_initializer=bias_init)(x)
+                x = tf.keras.layers.TimeDistributed(tf.keras.layers.Flatten())(x)
+                # relu in last conv layer gives values from 0 to inf.
+                # Hence, add +1+eps to avoid coefficients <=1 which break TF for greedy evaluation
+                outputs = tf.keras.layers.Lambda(lambda x: x+1.+tf.keras.backend.epsilon())(x)
+
+            # Create keras model
+            self._model = tf.keras.Model(inputs=inputs, outputs=outputs, name='Actor_GCN')
+            if debug > 0:
+                self._model.summary()
+
+        @property
+        def model(self):
+            """Returns the model."""
+            return self._model
+
+
+    class ValueNetGCN(network.Network):
+        """Value network architecture based on Graph Convolutions."""
+
+        NAME = 'gcn_critic'
+        """str: The name of the model class."""
+
+        def __init__(self
+                    ,input_tensor_spec
+                    ,latent_dim=32
+                    ,n_message_passing=2
+                    ,debug=0):
+            super(ValueNetGCN, self).__init__(
+                input_tensor_spec = input_tensor_spec,
+                state_spec=(),
+                name='ValueNetGCN')
+
+            # Build model
+            self.latent_dim = latent_dim
+            self._buildmodel(n_message_passing, debug)
+
+        def call(self, observations, step_type, network_state):
+            del step_type
+
+            # We extend the input tensor by a time dimension, if it has none
+            outer_rank = nest_utils.get_outer_rank(observations, self.input_tensor_spec)
+            if outer_rank == 1: # only batch_size
+                observations = tf.expand_dims(observations, axis=1)
+
+            # Evaluate model
+            value = self._model(observations)
+
+            # Squash added time dimension if added above
+            if outer_rank == 1: # only batch_size
+                value = tf.squeeze(value, axis=1)
+
+            # Remove last output dimension, which is of size [1] for the value net
+            # since the TF PPO agents seems to expect only a [batch x time] tensor.
+            value = tf.squeeze(value, axis=-1)
+
+            return value, network_state
+
+        def _buildmodel(self, n_message_passing, debug):
+            input_shape = self._input_tensor_spec.shape
+            nVar   = input_shape[-1]
+            Np1    = input_shape[-2]
+            nElems = input_shape[-5]
+
+            # New Shape (..., None, Np1, Np1, Np1, nVar) -> (..., None, Np1*Np1*Np1, nVar)
+            flatten_shape = (-1,nElems,np.power(Np1,3),nVar)
+
+            A = gcnn.utils.GridGraph.get_adjacency_matrix((Np1,Np1,Np1))
+
+            # Simple GCN with Encoder and Decoder
+            inputs = tf.keras.Input(shape=(None,)+input_shape)
+            x = tf.keras.layers.Reshape(flatten_shape)(inputs)
+
+            # Encoder
+            x = tf.keras.layers.Dense(             16, activation='relu', kernel_initializer='he_uniform')(x)
+            x = tf.keras.layers.Dense(self.latent_dim, activation='relu', kernel_initializer='he_uniform')(x)
+
+            # n rounds of GCN-style message passing
+            for _ in range(n_message_passing):
+                x = gcnn.layers.GraphConv(self.latent_dim, A, kernel_initializer = 'he_uniform', sparse_op = False)(x)
+                x = tf.keras.layers.Activation('relu')(x)
+
+            # Readout layer
+            x = gcnn.layers.GraphReadout(reduction_op='mean', reduction_dim=-2)(x)
+
+            # Decoder
+            x = tf.keras.layers.Dense(16, activation='relu', kernel_initializer='he_uniform')(x)
+            x = tf.keras.layers.Dense( 1, activation= None , kernel_initializer='he_uniform')(x)
+            outputs = gcnn.layers.GraphReadout(reduction_op='mean', reduction_dim=-2)(x)
+
+            # Create keras model
+            self._model = tf.keras.Model(inputs=inputs, outputs=outputs, name='Value_GCN')
+            if debug > 0:
+                self._model.summary()
+
+        @property
+        def model(self):
+            """Returns the model."""
+            return self._model
