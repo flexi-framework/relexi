@@ -21,8 +21,7 @@ reward:
   reward_kmin: 1
   reward_kmax: 9
   reward_scale: 0.4
-    #reward_spectrum_file: ./simulation_files/LM_Channel_0180_vel_fluc_prof.dat
-  reward_spectrum_file: ./simulation_files/LM_Channel_0180_mean_prof.dat
+  reward_spectrum_file: ./simulation_files/LM_Channel_0180_mean_vel_fluc_prof.dat
 
 # All parameters regarding the training
 training:

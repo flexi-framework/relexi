@@ -37,6 +37,7 @@ import relexi.io.output as rlxout
 
 # Try to load matplotlib
 try:
+    import matplotlib
     import matplotlib.pyplot as plt
     MATPLOTLIB_FOUND = True
 except ImportError:
@@ -57,12 +58,13 @@ class flexiEnv(py_environment.PyEnvironment):
             environments can be subclassed.
     """
 
-    RS_COL_Y  = 0
-    RS_COL_YP = 1
-    RS_COL_UU = 2
-    RS_COL_VV = 3
-    RS_COL_WW = 4
-    RS_COL_UV = 5
+    REF_COL_Y  = 0
+    REF_COL_YP = 1
+    REF_COL_U_MEAN = 2
+    REF_COL_UU = 6
+    REF_COL_VV = 7
+    REF_COL_WW = 8
+    REF_COL_UV = 9
     """Column indices of the DNS statistics file"""
 
     FLEXI_COL_Y = 0
@@ -349,22 +351,24 @@ class flexiEnv(py_environment.PyEnvironment):
         TYPE = 3
         if TYPE == 1:
             # 1. Reward only on U_mean (Use U_mean Moser data as spectra_file!)
-            LES_COL = [self.FLEXI_COL_U_MEAN]
-            DNS_COL = [self.RS_COL_UU]
+            LES_COLS = [self.FLEXI_COL_U_MEAN]
+            DNS_COLS = [self.REF_COL_U_MEAN]
         elif TYPE == 2:
             # 2. Reward only on U'U' Fluctuations
-            LES_COL = [self.FLEXI_COL_UU]
-            DNS_COL = [self.RS_COL_UU]
+            LES_COLS = [self.FLEXI_COL_UU]
+            DNS_COLS = [self.REF_COL_UU]
         elif TYPE == 3:
             # 3. Reward on 3 diagonal Fluctuations (U'U',V'V',W'W')
-            LES_COL = [self.FLEXI_COL_UU, self.FLEXI_COL_VV, self.FLEXI_COL_WW]
-            DNS_COL = [self.RS_COL_UU, self.RS_COL_VV, self.RS_COL_WW]
+            LES_COLS = [self.FLEXI_COL_UU, self.FLEXI_COL_VV, self.FLEXI_COL_WW]
+            DNS_COLS = [self.REF_COL_UU, self.REF_COL_VV, self.REF_COL_WW]
         elif TYPE == 4:
             # 4. Reward on all 4 Fluctuations (U'U',V'V',W'W',U'V')
-            LES_COL = [self.FLEXI_COL_UU, self.FLEXI_COL_VV,
-                       self.FLEXI_COL_WW, self.FLEXI_COL_UV]
-            DNS_COL = [self.RS_COL_UU, self.RS_COL_VV,
-                       self.RS_COL_WW, self.RS_COL_UV]
+            LES_COLS = [self.FLEXI_COL_UU, self.FLEXI_COL_VV,
+                        self.FLEXI_COL_WW, self.FLEXI_COL_UV]
+            DNS_COLS = [self.REF_COL_UU, self.REF_COL_VV,
+                        self.REF_COL_WW, self.REF_COL_UV]
+        else:
+            raise ValueError("Invalid reward type selected!")
 
         key = "Ekin"
         for i in range(self.n_envs):
@@ -380,17 +384,17 @@ class flexiEnv(py_environment.PyEnvironment):
             else:
                 self.RS_LES = np.append(self.RS_LES, np.expand_dims(data, axis=0), axis=0)
 
-            error  = self.RS_LES[i, LES_COL, :] - RS_DNS2LES[DNS_COL, :]
-            error /= RS_DNS2LES[DNS_COL, :]
+            error  = self.RS_LES[i, LES_COLS, :] - RS_DNS2LES[DNS_COLS, :]
+            error /= RS_DNS2LES[DNS_COLS, :]
 
             # Check if data was sent. If not, reward is sparse, hence set to 0
-            if np.linalg.norm(self.RS_LES[i,LES_COL, :]) < 1.e-4:
+            if np.linalg.norm(self.RS_LES[i,LES_COLS, :]) < 1.e-4:
                 reward[i] = 0.
             else:
                 reward[i] = 2.*np.exp(-1.*np.mean(np.square(error))/self.reward_scale)-1.
         return reward
 
-    def _get_reward_action(self,Cs_target=0.1):
+    def _get_reward_action(self,cs_target=0.1):
         """Compute the reward for the agent, based on the current flow state."""
         reward = np.zeros( (self.n_envs,) )
         for i in range(self.n_envs):
@@ -405,7 +409,7 @@ class flexiEnv(py_environment.PyEnvironment):
                 self.RS_LES = np.expand_dims(data,axis=0)
             else:
                 self.RS_LES = np.append(self.RS_LES,np.expand_dims(data,axis=0),axis=0)
-            reward[i] = 2.*np.exp(-1.*np.mean(np.square(self.action[i,:]-Cs_target)/self.reward_scale))-1.
+            reward[i] = 2.*np.exp(-1.*np.mean(np.square(self.action[i,:]-cs_target)/self.reward_scale))-1.
         return reward
 
     def _interpolate_DNS_to_LES(self,RS_DNS,RS_LES):
@@ -417,24 +421,18 @@ class flexiEnv(py_environment.PyEnvironment):
         """Reads and parses the DNS Reynolds stresses in the data format provided by Moser et al. 2015."""
         with open(rs_file,'r',encoding='ascii') as f:
             # reading the CSV file
-            csvFile = csv.reader(f,delimiter=' ')
+            csv_file = csv.reader(f,delimiter=' ')
 
             # displaying the contents of the CSV file
             i = 0
             first=True
-            for line in csvFile:
+            for line in csv_file:
                 # Skip header section
                 if '%' in line[0]:
                     continue
 
                 # Build list of target statistics [y,u'u',v'v',w'w',u'v']
                 mylist = [float(i) for i in line[:] if i != '']
-                mylist = [mylist[self.RS_COL_Y ],
-                          mylist[self.RS_COL_YP],
-                          mylist[self.RS_COL_UU],
-                          mylist[self.RS_COL_VV],
-                          mylist[self.RS_COL_WW],
-                          mylist[self.RS_COL_UV]]
                 # End append data
                 if first:
                     data = np.zeros((len(mylist),1))
@@ -442,7 +440,7 @@ class flexiEnv(py_environment.PyEnvironment):
                     first=False
                 else:
                     data = np.append(data,np.expand_dims(np.asarray(mylist),axis=1),axis=1)
-                data[self.RS_COL_Y,-1] -= 1. # Map y coordinate from [0,1] to [-1,0]
+                data[self.REF_COL_Y,-1] -= 1. # Map y coordinate from [0,1] to [-1,0]
 
         return data
 
@@ -477,29 +475,46 @@ class flexiEnv(py_environment.PyEnvironment):
         Returns:
             TF-compatible buffer with image that can be passed to Tensorboard.
         """
+        custom_cycle =  matplotlib.cycler('color', ['g', 'r', 'b', 'm']*2) + \
+                        matplotlib.cycler('linestyle', ['-']*4 + ['--']*4)
+        # Set default global style using rcParams
+        plt.rcParams.update({
+            'figure.figsize': (8, 6),          # Set default figure size
+            'lines.linewidth': 2,              # Set default line width
+            'axes.grid': True,                 # Enable grid by default
+            'axes.prop_cycle': custom_cycle    # Set custom color cycle
+        })
+
+        # Create figure with two y-axis
+        fig, ax1 = plt.subplots()
+        ax2 = ax1.twinx()
 
         # Plot Spectra
-        fig = plt.figure(figsize=(8,5))
-        plt.plot(RS_DNS[  0,:]+1.,RS_DNS[  1,:], label='DNS uu',    linestyle='--',color='g',linewidth=2)
-        plt.plot(RS_DNS[  0,:]+1.,RS_DNS[  2,:], label='DNS vv',    linestyle='--',color='r',linewidth=2)
-        plt.plot(RS_DNS[  0,:]+1.,RS_DNS[  3,:], label='DNS ww',    linestyle='--',color='b',linewidth=2)
-        plt.plot(RS_DNS[  0,:]+1.,RS_DNS[  4,:], label='DNS uv',    linestyle='--',color='k',linewidth=2)
-        plt.plot(RS_LES[0,0,:]+1.,RS_LES[0,1,:], label='LES U_mean',linestyle='-' ,color='g',linewidth=2)
-        plt.plot(RS_LES[0,0,:]+1.,RS_LES[0,2,:], label='LES uu',    linestyle='-' ,color='g',linewidth=2)
-        plt.plot(RS_LES[0,0,:]+1.,RS_LES[0,3,:], label='LES vv',    linestyle='-' ,color='r',linewidth=2)
-        plt.plot(RS_LES[0,0,:]+1.,RS_LES[0,4,:], label='LES ww',    linestyle='-' ,color='b',linewidth=2)
-        plt.plot(RS_LES[0,0,:]+1.,RS_LES[0,5,:], label='LES uv',    linestyle='-' ,color='k',linewidth=2)
-
-        plt.xlabel('y', fontsize=21)
-        plt.ylabel('RS',fontsize=21)
+        ax1.plot(RS_DNS[self.REF_COL_Y,:]+1.,RS_DNS[self.REF_COL_UU,:], label='DNS uu')
+        ax1.plot(RS_DNS[self.REF_COL_Y,:]+1.,RS_DNS[self.REF_COL_VV,:], label='DNS vv')
+        ax1.plot(RS_DNS[self.REF_COL_Y,:]+1.,RS_DNS[self.REF_COL_WW,:], label='DNS ww')
+        ax1.plot(RS_DNS[self.REF_COL_Y,:]+1.,RS_DNS[self.REF_COL_UV,:], label='DNS uv')
+        ax2.plot(RS_DNS[self.REF_COL_Y,:]+1.,RS_DNS[self.REF_COL_U_MEAN,:], 'k-', label='DNS U_mean')
+        ax1.plot(RS_LES[0,self.FLEXI_COL_Y,:]+1.,RS_LES[0,self.FLEXI_COL_UU,:], label='LES uu')
+        ax1.plot(RS_LES[0,self.FLEXI_COL_Y,:]+1.,RS_LES[0,self.FLEXI_COL_VV,:], label='LES vv')
+        ax1.plot(RS_LES[0,self.FLEXI_COL_Y,:]+1.,RS_LES[0,self.FLEXI_COL_WW,:], label='LES ww')
+        ax1.plot(RS_LES[0,self.FLEXI_COL_Y,:]+1.,RS_LES[0,self.FLEXI_COL_UV,:], label='LES uv')
+        ax2.plot(RS_LES[0,self.FLEXI_COL_Y,:]+1.,RS_LES[0,self.FLEXI_COL_U_MEAN,:], 'k--', label='LES U_mean')
+        ax1.set_xlabel('y', fontsize=21)
+        ax1.set_ylabel('RS',fontsize=21)
+        ax2.set_ylabel('U_Mean',fontsize=21)
+        ax2.grid(visible=False)
         plt.xlim(0.01,1.)
         plt.xscale('log')
-        spacing_fac = 1.1
-        ymin = np.minimum(0,np.floor(spacing_fac*np.amin(RS_DNS[1:4,:])))
-        ymax = np.ceil(spacing_fac*np.amax(RS_DNS[1:4,:]))
-        plt.ylim(ymin,ymax)
-        plt.legend(fontsize=12)
-        plt.grid()
+        spacing_fac = 1.15
+        ymin = 0.
+        ymax = spacing_fac*np.max(RS_DNS[self.REF_COL_UU,:])
+        ax1.set_ylim(ymin,ymax)
+        ymin = 0.
+        ymax = spacing_fac*np.max(RS_DNS[self.REF_COL_U_MEAN,:])
+        ax2.set_ylim(ymin,ymax)
+        ax1.legend(fontsize=10, loc='upper left')
+        ax2.legend(fontsize=10, loc='upper right')
         plt.tight_layout()
 
         # Buffer image as png in memory
