@@ -86,6 +86,7 @@ class flexiEnv(py_environment.PyEnvironment):
                  reward_kmin,
                  reward_kmax,
                  reward_scale,
+                 action_scale=0.3,
                  n_procs=1,
                  n_envs=1,
                  restart_files=None,
@@ -106,6 +107,8 @@ class flexiEnv(py_environment.PyEnvironment):
         #self.reward_kmin = reward_kmin
         #self.reward_kmax = reward_kmax
         self.reward_scale = reward_scale
+        # Set scaling for actions
+        self.action_scale = action_scale
 
         # Sanity Check Launcher
         self.env_launcher = env_launcher
@@ -290,7 +293,7 @@ class flexiEnv(py_environment.PyEnvironment):
         """
         # Scale actions to [0,0.5]
         # TODO: make this a user parameter
-        action_mod = action * 0.5
+        action_mod = action * self.action_scale
         for i in range(self.n_envs):
             _ = self.client.put_tensor(self.tag[i]+"actions", action_mod[i,::].astype(np.float64))
 
@@ -376,6 +379,12 @@ class flexiEnv(py_environment.PyEnvironment):
             self.client.poll_tensor(self.tag[i] + key, 10, 1000)
             data = self.client.get_tensor(self.tag[i] + key)
             self.client.delete_tensor(self.tag[i] + key)
+
+            # Check if data was sent. If not, reward is sparse, hence set to 0
+            if np.linalg.norm(data) < 1.e-4:
+                reward[i] = 0.
+                continue
+
             # Interpolate DNS to LES points
             RS_DNS2LES = self._interpolate_DNS_to_LES(self.RS_DNS, data)
             # Append Reynolds Stresses
@@ -387,11 +396,7 @@ class flexiEnv(py_environment.PyEnvironment):
             error  = self.RS_LES[i, LES_COLS, :] - RS_DNS2LES[DNS_COLS, :]
             error /= RS_DNS2LES[DNS_COLS, :]
 
-            # Check if data was sent. If not, reward is sparse, hence set to 0
-            if np.linalg.norm(self.RS_LES[i,LES_COLS, :]) < 1.e-4:
-                reward[i] = 0.
-            else:
-                reward[i] = 2.*np.exp(-1.*np.mean(np.square(error))/self.reward_scale)-1.
+            reward[i] = np.exp(-1.*np.mean(np.square(error))/self.reward_scale)
         return reward
 
     def _get_reward_action(self,cs_target=0.1):
