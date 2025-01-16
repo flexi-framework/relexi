@@ -351,7 +351,7 @@ class flexiEnv(py_environment.PyEnvironment):
         reward = np.zeros((self.n_envs,))
 
         # Select type of reward to be computed
-        TYPE = 3
+        TYPE = 1
         if TYPE == 1:
             # 1. Reward only on U_mean (Use U_mean Moser data as spectra_file!)
             LES_COLS = [self.FLEXI_COL_U_MEAN]
