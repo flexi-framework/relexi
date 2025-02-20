@@ -246,10 +246,11 @@ class Runtime():
                                                   )
             else:
                 if launcher == 'mpirun':
-                    run_args = {
-                        'rankfile': self.launch_config.rankfiles[i],
-                        'report-bindings': None
-                    }
+                    if len(self.hosts) > 1: 
+                        run_args = { 'rankfile': self.launch_config.rankfiles[i] }
+                    else:
+                        run_args = { 'bind-to': 'none' }
+                    run_args.update({ 'report-bindings': None })
                 elif launcher == 'srun':
                     run_args = {
                         'mpi': 'pmix',
