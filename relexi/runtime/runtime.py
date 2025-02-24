@@ -246,7 +246,7 @@ class Runtime():
                                                   )
             else:
                 if launcher == 'mpirun':
-                    if len(self.hosts) > 1: 
+                    if self.is_distributed: 
                         run_args = { 'rankfile': self.launch_config.rankfiles[i] }
                     else:
                         run_args = { 'bind-to': 'none' }

@@ -95,7 +95,7 @@ class LaunchConfig():
 
         # Generate rankfiles for OpenMPI
         self._rankfiles = None
-        if self.type == 'mpirun' and len(runtime.hosts) > 1:
+        if self.type == 'mpirun' and runtime.is_distributed:
             slots_per_node = runtime.n_worker_slots//len(self.workers)
             self._rankfiles = self._generate_rankfile_ompi(self.workers,
                                                            slots_per_node,
