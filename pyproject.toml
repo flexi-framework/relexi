@@ -35,7 +35,7 @@ smartsim = ">=0.4,<0.7"
 smartredis = "*"
 tensorflow = ">=2.15,<2.16"
 tf-agents = "*"
-cmake = "*"
+cmake = "3.*" # RedisAI incompatible with cmake 4.x
 pyyaml = "*"
 matplotlib = "*"
 setuptools = "!=70.*" # Known bugs
