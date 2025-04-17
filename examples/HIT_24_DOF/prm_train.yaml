@@ -1,6 +1,6 @@
 # Project
 project:
-  run_name:     HIT_32DOF
+  run_name:     HIT_24DOF_train_distributed
   restart_dir:  null
   random_seed:  124
   log_interval: 1
@@ -8,8 +8,8 @@ project:
 # All parameters for setting up the environment
 environment:
   env_name: hit
-  num_procs_per_environment:  1
-  num_parallel_environments:  2
+  num_procs_per_environment:  8
+  num_parallel_environments: 32
   executable_path: ../../../flexi-extensions/build/bin/flexi
   parameter_file: ./simulation_files/parameter_flexi.ini
   env_launcher: local
@@ -17,21 +17,21 @@ environment:
 # All parameters for setting up the reward
 reward:
   reward_kmin: 1
-  reward_kmax: 12
-  reward_scale: 0.2
+  reward_kmax: 9
+  reward_scale: 0.4
   reward_spectrum_file: ./simulation_files/DNS_spectrum_stats_t2_to_t10.csv
 
 # All parameters regarding the training
 training:
   train_num_epochs: 5
   train_learning_rate: 1.e-4
-  train_num_iterations: 10
+  train_num_iterations: 4000
   train_buffer_capacity: 2000
   train_files:
-    - ./simulation_files/run_f200_N7_4Elems_State_0000003.000000000.h5
-    - ./simulation_files/run_f200_N7_4Elems_State_0000004.000000000.h5
-    - ./simulation_files/run_f200_N7_4Elems_State_0000005.000000000.h5
-    - ./simulation_files/run_f200_N7_4Elems_State_0000006.000000000.h5
+    - ./simulation_files/run_f200_N5_4Elems_State_0000003.000000000.h5
+    - ./simulation_files/run_f200_N5_4Elems_State_0000004.000000000.h5
+    - ./simulation_files/run_f200_N5_4Elems_State_0000005.000000000.h5
+    - ./simulation_files/run_f200_N5_4Elems_State_0000006.000000000.h5
 
 # All parameters for the agent
 agent:
@@ -50,18 +50,13 @@ checkpoint:
 
 # Evaluation
 evaluation:
-  eval_num_episodes: 1
-  eval_interval:     5
+  eval_num_episodes:  1
+  eval_interval:     10
   eval_files:
-    - ./simulation_files/run_f200_N7_4Elems_State_0000008.000000000.h5
-
-# Performance
-performance:
-  use_XLA:    False
-  do_profile: False
+    - ./simulation_files/run_f200_N5_4Elems_State_0000008.000000000.h5
 
 # SmartSim
 smartsim:
   smartsim_port: 6780
-  smartsim_network_interface: local
+  smartsim_network_interface: ib0
   smartsim_orchestrator: auto
