@@ -16,6 +16,9 @@ For details on its scaling behavior, suitability for HPC and for use cases, plea
 * [Kurz, M., Offenhäuser, P., Viola, D., Shcherbakov, O., Resch, M., & Beck, A. (2022). Deep Reinforcement Learning for Computational Fluid Dynamics on HPC Systems. Journal of Computational Science, 65, 101884.](https://doi.org/10.1016/j.jocs.2022.101884)
 * [Kurz, M., Offenhäuser, P., & Beck, A. (2023). Deep reinforcement learning for turbulence modeling in large eddy simulations. International Journal of Heat and Fluid Flow, 99, 109094.](https://doi.org/10.1016/j.ijheatfluidflow.2022.109094)
 * [Beck, A., & Kurz, M. (2023). Toward discretization-consistent closure schemes for large eddy simulation using reinforcement learning. Physics of Fluids, 35(12), 125122.](https://doi.org/10.1063/5.0176223)
+* [Kurz, M., Kaushik, R., Blind, M., Kopper, P., Schwarz, A., Rodach, F., & Beck, A. (2025). Invariant Control Strategies for Active Flow Control using Graph Neural Networks. Preprint on arXiv:2503.22775.](https://doi.org/10.48550/arXiv.2503.22775)
+* [Kurz, M., Beck, A., & Sanderse, B. (2025). Harnessing Equivariance: Modeling Turbulence with Graph Neural Networks. Preprint on arXiv:2504.07741.](https://doi.org/10.48550/arXiv.2504.07741)
+
 
 This is a scientific project.
 If you use Relexi or find it helpful, please cite the project using a suitable reference from the list above referring to either the general Relexi project, its HPC aspects or its application for scientific modeling tasks, respectively.
