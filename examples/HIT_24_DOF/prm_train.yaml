@@ -12,7 +12,7 @@ environment:
   num_parallel_environments: 32
   executable_path: ../../../flexi-extensions/build/bin/flexi
   parameter_file: ./simulation_files/parameter_flexi.ini
-  env_launcher: local
+  env_launcher: mpirun
 
 # All parameters for setting up the reward
 reward:

@@ -1,0 +1,29 @@
+#!/bin/bash
+#PBS -N relexi_HIT_24_DOF
+#PBS -o relexi_HIT_24_DOF.out
+#PBS -e relexi_HIT_24_DOF.err
+#PBS -l walltime=24:00:00
+#PBS -l select=1:node_type=rome:mpiprocs=1+1:node_type=rome:mpiprocs=128
+
+# Change directory and launch parallel job on the allocated compute nodes
+cd $PBS_O_WORKDIR
+
+# Load Modules
+#-----------------
+#module load XXXX
+
+# Load Python Environment
+#-----------------
+#source ~/.venv/bin/activate
+
+# Set Environment Variables
+#-----------------
+# Ensure python writes are directly flushed to stdout
+export PYTHONUNBUFFERED=1  
+# SmartSim and TF Logging
+export SMARTSIM_LOG_LEVEL="quiet"
+export SMARTSIM_FLAG_TELEMETRY=0
+export TF_CPP_MIN_LOG_LEVEL=2
+
+# Start Relexi
+relexi prm_train.yaml

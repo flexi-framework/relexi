@@ -82,9 +82,13 @@ For this, the following parameters have to be adapted:
 ### Training on a cluster
 
 For running the training on a distributed cluster, two different schedulers are currently supported: `SLURM` and `PBS`.
-You can find exemplary batch scripts in this folder and the training setup of the reference publication is given in the `prm_train.yaml` file.
-So running
+The scripts `jobfile.slurm` and `jobfile.pbs` are given as exemplary jobfiles to submit the job to the scheduler using either
 ```bash
-relexi prm_train.yaml
+qsub jobfile.pbs      # for PBS
+sbatch jobfile.slurm  # for SLURM
 ```
-will reproduce the training run of the reference publication.
+Please be aware that both scripts have to be adapted to the specific cluster setup regarding core counts, queue names, and other parameters.
+If only a single node is available in the job, Relexi runs in `local` mode, i.e. the same way as it would run on a local machine.
+If running in `distributed` mode (i.e. on multiple nodes of the system), the first node is always reserved to run relexi itself, while the other nodes are used to run the FLEXI instances.
+Most importantly, ensure to change the launcher to `env_launcher: srun` in the `prm_train.yaml` file to run the training with SLURM.
+Other than that, `prm_train.yaml` entails the exact training setup of the reference publication such that the reported results can be obtained by submitting this job on the HPC system.
